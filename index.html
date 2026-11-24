@@ -42,7 +42,7 @@ h2{font-size:20px;margin:18px 0 8px}
 .item{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:none;border:0;border-radius:0;padding:10px 4px;justify-content:flex-start}
 .chip{flex:none;min-width:58px;text-align:center;font-weight:700;font-size:13px;padding:5px 7px;border-radius:8px;color:var(--kf,#fff);background:var(--k)}
 .item .t{display:block;font-weight:700;font-size:15px}.item .s{display:block;color:var(--mut);font-size:14px}
-nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--bg);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:var(--bg);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:5}
 nav button{border:0;border-radius:0;background:none;min-height:60px;font-size:13px;flex-direction:column;gap:2px;color:var(--mut)}
 nav button[aria-current=true]{color:var(--pri);font-weight:700;box-shadow:inset 0 3px 0 var(--pri)}
 nav svg{width:22px;height:22px}
@@ -77,13 +77,12 @@ nav svg{width:22px;height:22px}
   <div class="mt"><input id="q" type="search" placeholder="O escribe: nombre, principio activo, CN o código SAP" autocomplete="off" aria-label="Buscar"></div>
   <div id="sres"></div>
 </section>
-<section id="v-rec" hidden></section>
 <section id="v-ubic" hidden></section>
 <section id="v-cn" hidden><h2>Códigos CN</h2><p class="mut">Escanea el código cuadrado de la caja (junto a Lote/CAD) y elige a qué medicamento del listado corresponde.</p><div id="cnslot"></div><div id="cnout"></div><div id="cnlist"></div></section>
 </main>
 <nav>
   <button data-v="scan" aria-current="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8V5h3M17 5h3v3M20 16v3h-3M7 19H4v-3M7 12h10"/></svg>Escanear</button>
-  <button data-v="rec"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16v13H4zM4 7l2-3h12l2 3M9 12h6"/></svg><span id="recN">Recepción</span></button>
+  
   <button data-v="ubic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4zM4 10h16M4 15h16M12 4v16"/></svg>Ubicaciones</button>
   <button data-v="cn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6v12M8 6v12M11 6v12M15 6v12M17 6v12M20 6v12"/></svg>Códigos CN</button>
 </nav>
@@ -113,13 +112,12 @@ const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase(
 const toks=s=>norm(s).split(' ').filter(t=>t.length>1||/\d/.test(t));
 const nameOf=m=>m.den||m.pa;
 let links=new Map(Object.entries(ls.get('cnLinks',{})));
-let rec=ls.get('recepcion',[]);
 fetch('meds.json').then(r=>r.json()).then(rows=>{
   MEDS=rows.map((r,i)=>{const m={u:r[0],pa:r[1],den:r[2],sap:r[3],note:r[4]};m.k=m.sap||('x'+i);m.t=[...new Set(toks(m.pa+' '+m.den+' '+m.sap))];return m});
   MEDS.forEach(m=>{BY[m.k]=m;m.t.forEach(t=>VOC[t]=(VOC[t]||0)+1)});
   for(const t in VOC)IDF[t]=Math.log(1+MEDS.length/VOC[t]);
   MEDS.forEach(m=>m.w=Math.sqrt(m.t.reduce((a,t)=>a+IDF[t],0)));
-  renderRec();renderUbic();renderCN();flush();
+  renderUbic();renderCN();flush();
 }).catch(()=>{$('#out').innerHTML='<div class="empty">No se ha podido cargar el listado.</div>'});
 
 function search(q){
@@ -144,12 +142,12 @@ function cnFor(k){for(const [c,v] of links)if(v.k===k)return c;return ''}
 function codes(m){return `CN: ${esc(cnFor(m.k))}${m.sap?' · SAP: '+esc(m.sap):''}`}
 function itemList(ms,act='show'){return `<ul class="list">${ms.map(m=>`<li><button class="item" data-act="${act}" data-k="${esc(m.k)}">${chip(m)}<span><span class="t">${esc(m.pa)}</span><span class="s">${esc(m.den||m.note)}</span><span class="s">${codes(m)}</span></span></button></li>`).join('')}</ul>`}
 function labelHTML(m,extra=''){
-  const z=zone(m.u),cn=cnFor(m.k),q=(rec.find(x=>x.k===m.k)||{}).q;
+  const z=zone(m.u),cn=cnFor(m.k);
   const assign=pendingCN&&pendingCN!==cn?`<button data-act="assign" data-k="${esc(m.k)}">Asignar CN ${esc(pendingCN)}</button>`:'';
   return `<article class="label" style="--k:${gcol(z.g)}"><div class="g">${esc(GROUPS[z.g])}</div>
   <div class="z">${chip(m)}<span>${z.num!=null?`<b>${z.num}</b> · `:''}${esc(z.name)}</span></div>
   <div class="body"><div class="pa">${esc(m.pa)}</div><dl><dt>CN</dt><dd>${esc(cn)}</dd><dt>SAP</dt><dd>${esc(m.sap)}</dd>${m.den?`<dt>Comercial</dt><dd>${esc(m.den)}</dd>`:''}${m.note?`<dt>Dónde</dt><dd>${esc(m.note)}</dd>`:''}</dl>${cimaSlot(cn,m.k)}
-  <div class="row mt"><button class="pri" data-act="add" data-k="${esc(m.k)}">${q?'+1 a recepción ('+q+')':'+1 a recepción'}</button><button data-act="next">Siguiente caja →</button>${assign}${extra}</div></div></article>`;
+  <div class="row mt"><button class="pri" data-act="next">Siguiente caja →</button>${assign}${extra}</div></div></article>`;
 }
 
 /* ---------- cámara (modo escanear / modo CN) ---------- */
@@ -249,12 +247,7 @@ document.addEventListener('click',e=>{
   else if(a==='pick'){lock(k,'Elegido')}
   else if(a==='assign'){const cn=pendingCN;link(cn,k);pendingCN='';state(`CN ${cn} asignado`,false);$('#out').innerHTML=labelHTML(BY[k])}
   else if(a==='alts'){const c=matchText(lastText).map(x=>x.m).filter(m=>m.k!==locked);$('#out').innerHTML=c.length?'<p class="mut">Otras coincidencias:</p>'+itemList(c,'pick'):'<div class="empty">No hay otras coincidencias. Búscalo escribiendo abajo.</div>';locked=null}
-  else if(a==='add'){const r=rec.find(x=>x.k===k);if(r)r.q++;else rec.push({k,q:1,d:false});saveRec();b.textContent='+1 a recepción ('+rec.find(x=>x.k===k).q+')'}
   else if(a==='next'){skipK=locked;skipUntil=Date.now()+6000;pendingCN='';lastText='';$('#out').innerHTML='';stream?(resume(),state('Buscando la siguiente caja…',true)):state('Cámara apagada',false)}
-  else if(a==='inc'||a==='dec'){const r=rec.find(x=>x.k===k);if(!r)return;r.q=Math.max(0,r.q+(a==='inc'?1:-1));if(!r.q)rec=rec.filter(x=>x!==r);saveRec()}
-  else if(a==='clear'){if(b.dataset.sure){rec=[];saveRec()}else{b.dataset.sure=1;b.textContent='Toca otra vez para vaciar'}}
-  else if(a==='csv')exportCSV(table(),'recepcion');
-  else if(a==='tsv')copy(table().map(r=>r.map(c=>String(c).replace(/\t|\n/g,' ')).join('\t')).join('\n'),b);
   else if(a==='cnpick'){link(pendingCN,k);$('#cnout').innerHTML=`<div class="ok">✓ CN <b>${esc(pendingCN)}</b> asignado a <b>${esc(BY[k].pa)}</b> (SAP ${esc(BY[k].sap)})</div>${cimaSlot(pendingCN,k)}<div class="row mt"><button class="pri" data-act="cnnext">Escanear otra caja</button></div>`;pendingCN=''}
   else if(a==='cnnext'){pendingCN='';lastText='';$('#cnout').innerHTML='';stream?(resume(),state('Apunta al código cuadrado de la caja',true)):startCam()}
   else if(a==='cnmanual'){const v=($('#cnin').value||'').replace(/\D/g,'').slice(0,6);if(v.length!==6){$('#cnin').focus();return}pendingCN=v;locked='cn';clearInterval(bcT);clearTimeout(loopT);cnPanel()}
@@ -266,31 +259,14 @@ document.addEventListener('click',e=>{
   else if(a==='zone')openZone(b.dataset.z);
   else if(a==='zback')renderUbic();
 });
-document.addEventListener('change',e=>{if(e.target.dataset.done){const r=rec.find(x=>x.k===e.target.dataset.done);if(r){r.d=e.target.checked;saveRec()}}});
 function go(v){
   if(stream)stopCam();locked=null;pendingCN='';
-  ['scan','rec','ubic','cn'].forEach(x=>$('#v-'+x).hidden=x!==v);document.querySelectorAll('nav button').forEach(n=>n.setAttribute('aria-current',n.dataset.v===v));
+  ['scan','ubic','cn'].forEach(x=>$('#v-'+x).hidden=x!==v);document.querySelectorAll('nav button').forEach(n=>n.setAttribute('aria-current',n.dataset.v===v));
   if(v==='cn'||v==='scan'){mode=v;$(v==='cn'?'#cnslot':'#scanslot').appendChild($('#camwrap'));$('#offmsg').textContent=v==='cn'?'Apunta al código cuadrado de la caja (junto a Lote/CAD)':'Apunta al nombre del medicamento dentro del recuadro';$('#out').innerHTML='';$('#cnout').innerHTML='';}
   if(v==='cn')flush();
   scrollTo({top:0});
 }
 
-/* ---------- recepción ---------- */
-function saveRec(){ls.set('recepcion',rec);renderRec()}
-function recRows(){return rec.map(r=>({...r,m:BY[r.k]})).filter(r=>r.m).sort((a,b)=>GORD.indexOf(zone(a.m.u).g)-GORD.indexOf(zone(b.m.u).g)||zone(a.m.u).ord-zone(b.m.u).ord||a.m.pa.localeCompare(b.m.pa))}
-function renderRec(){
-  const rows=recRows(),n=rows.reduce((a,r)=>a+r.q,0);$('#recN').textContent=n?`Recepción (${n})`:'Recepción';
-  if(!rows.length){$('#v-rec').innerHTML='<h2>Recepción</h2><div class="empty">Aún no hay nada. Escanea un medicamento y pulsa «+1 a recepción» (una vez por unidad). Aquí lo verás agrupado por ubicación para colocarlo en un solo recorrido.</div>';return}
-  let h=`<h2>Recepción</h2><p class="mut">${rows.length} producto${rows.length>1?'s':''} · ${n} unidad${n>1?'es':''}</p><div class="row"><button data-act="csv">Descargar Excel (CSV)</button><button data-act="tsv">Copiar para Excel</button><button data-act="clear">Vaciar</button></div>`,g=null,u=null;
-  for(const r of rows){const z=zone(r.m.u);
-    if(z.g!==g){g=z.g;u=null;h+=`<div class="ghead" style="--k:${gcol(g)}">${esc(GROUPS[g])}</div>`}
-    if(z.code!==u){u=z.code;h+=`<div class="sub">${chip(r.m)}${esc(z.name)}</div>`}
-    h+=`<div class="rec${r.d?' done':''}"><div><span class="t" style="font-weight:700">${esc(r.m.pa)}</span><div class="mut">${esc(r.m.den||r.m.note)}</div><div class="mut">${codes(r.m)}</div><label class="chk"><input type="checkbox" data-done="${esc(r.k)}"${r.d?' checked':''}>Colocado</label></div><div class="qty"><button data-act="dec" data-k="${esc(r.k)}" aria-label="Menos">−</button><span>${r.q}</span><button data-act="inc" data-k="${esc(r.k)}" aria-label="Más">+</button></div></div>`}
-  $('#v-rec').innerHTML=h;
-}
-function table(){const d=new Date().toLocaleString('es-ES');return [['CN','Código SAP','Grupo','Ubicación','Descripción ubicación','Principio activo','Denominación comercial','Cantidad','Colocado','Fecha'],...recRows().map(r=>{const z=zone(r.m.u);return[cnFor(r.k),r.m.sap,GROUPS[z.g],r.m.u,z.name,r.m.pa,r.m.den||r.m.note,r.q,r.d?'Sí':'No',d]})]}
-function exportCSV(rows,name){const csv='﻿'+rows.map(r=>r.map(c=>{c=String(c??'');return /[;"\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c}).join(';')).join('\r\n');
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=name+'_'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
 async function copy(t,b){const o=b.textContent;try{await navigator.clipboard.writeText(t);b.textContent='✓ Copiado'}catch(e){b.textContent='No se pudo copiar'}setTimeout(()=>b.textContent=o,1800)}
 
 /* ---------- ubicaciones ---------- */
