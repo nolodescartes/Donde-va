@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a5c7a">
+<title>¿Dónde va?</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#0e1519);--ink:light-dark(#13202b,#e8eef2);--mut:light-dark(#5b6b77,#9aabb7);--line:light-dark(#dde4e9,#25323b);--soft:light-dark(#f2f6f8,#152027);--pri:light-dark(#0a5c7a,#5fb6d6);--pri-ink:light-dark(#fff,#06202b);--acc:#ff6a3d;
+--frio:light-dark(#1d6fd1,#6aa9f5);--est:light-dark(#c62828,#ff7a7a);--cito:light-dark(#7b3fa0,#c897e8);--amb:light-dark(#00796b,#4fd1bf);--gen:light-dark(#3b4a56,#b7c6d1);--top:light-dark(#b0570b,#f5a55c);--nut:light-dark(#2e7d32,#7fd483);--lab:light-dark(#5d4037,#c9a99c);--warn:light-dark(#a35f00,#f0b44c)}
+*{box-sizing:border-box;min-width:0}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow-x:clip;padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+header{background:var(--pri);color:var(--pri-ink);padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;gap:10px}
+header h1{margin:0;font-size:22px}
+main{max-width:760px;margin:0 auto;padding:12px 14px}
+button,.btn{font:inherit;font-size:16px;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--soft);color:var(--ink);padding:8px 14px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.pri{background:var(--acc);border:0;color:#1b0a03;font-weight:700}
+input[type=search],textarea{font:inherit;font-size:16px;width:100%;min-height:48px;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+textarea{min-height:90px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.mt{margin-top:12px}.mut{color:var(--mut);font-size:14px}
+h2{font-size:20px;margin:18px 0 8px}
+.cam{position:relative;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:4/3;max-height:46vh;width:100%}
+.cam video{width:100%;height:100%;object-fit:cover;display:block}
+.cam .guide{position:absolute;inset:18% 8%;border:3px solid rgba(255,255,255,.85);border-radius:12px;box-shadow:0 0 0 999px rgba(0,0,0,.28)}
+.cam .tools{position:absolute;right:8px;top:8px;display:flex;gap:6px}
+.cam .tools button{background:rgba(0,0,0,.55);color:#fff;border:0;min-width:44px}
+.cam .off{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;color:#fff;text-align:center;padding:16px}
+.state{margin-top:8px;font-size:15px;display:flex;align-items:center;gap:8px;min-height:24px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--mut);flex:none}.dot.on{background:#2fbf71;animation:p 1.2s infinite}
+@keyframes p{50%{opacity:.3}}
+.label{border:2px solid var(--k);border-radius:14px;overflow:hidden;margin-top:12px}
+.label .g{background:var(--k);color:var(--bg);padding:12px 16px;font-size:clamp(26px,8vw,40px);font-weight:800;line-height:1.05}
+.label .z{display:flex;gap:10px;align-items:center;padding:10px 16px;background:color-mix(in srgb,var(--k) 12%,var(--bg))}
+.label .z b{font-size:22px}
+.label .body{padding:10px 16px 14px}.label .pa{font-size:18px;font-weight:700}
+.label dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;margin:6px 0 0;font-size:15px}.label dt{color:var(--mut)}.label dd{margin:0;overflow-wrap:anywhere}
+.list{list-style:none;margin:6px 0 0;padding:0;border-top:1px solid var(--line)}.list li{border-bottom:1px solid var(--line)}
+.item{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:none;border:0;border-radius:0;padding:10px 4px;justify-content:flex-start}
+.chip{flex:none;min-width:58px;text-align:center;font-weight:700;font-size:13px;padding:5px 7px;border-radius:8px;color:var(--bg);background:var(--k)}
+.item .t{display:block;font-weight:700;font-size:15px}.item .s{display:block;color:var(--mut);font-size:14px}
+nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--bg);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav button{border:0;border-radius:0;background:none;min-height:60px;font-size:13px;flex-direction:column;gap:2px;color:var(--mut)}
+nav button[aria-current=true]{color:var(--pri);font-weight:700;box-shadow:inset 0 3px 0 var(--pri)}
+nav svg{width:22px;height:22px}
+.qty{display:flex;align-items:center;gap:4px}.qty button{min-width:44px;padding:0}.qty span{min-width:2.2em;text-align:center;font-weight:700}
+.rec{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.rec.done .t{text-decoration:line-through;color:var(--mut)}
+.chk{display:flex;align-items:center;gap:8px;font-size:14px}.chk input{width:22px;height:22px}
+.ghead{display:flex;align-items:center;gap:10px;margin-top:18px;padding:8px 12px;border-radius:10px;background:var(--k);color:var(--bg);font-weight:800;font-size:18px}
+.sub{margin:10px 0 0;font-weight:700;font-size:15px;display:flex;gap:8px;align-items:center}
+.note{border-left:4px solid var(--warn);padding:8px 12px;background:var(--soft);border-radius:0 8px 8px 0;font-size:15px}
+.empty{padding:18px;text-align:center;color:var(--mut);border:1px dashed var(--line);border-radius:12px;margin-top:12px}
+@media (prefers-reduced-motion:reduce){.dot.on{animation:none}}
+</style>
+</head>
+<body>
+<header><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><h1>¿Dónde va?</h1></header>
+<main>
+<section id="v-scan">
+  <div class="cam" id="cam">
+    <video id="video" playsinline muted></video>
+    <div class="guide" id="guide" hidden></div>
+    <div class="tools"><button id="torch" hidden aria-label="Linterna">💡</button><button id="stop" hidden aria-label="Parar cámara">✕</button></div>
+    <div class="off" id="off"><div>Apunta al nombre del medicamento dentro del recuadro</div><button class="pri" id="start">Activar cámara</button></div>
+  </div>
+  <div class="state"><span class="dot" id="dot"></span><span id="msg">Cámara apagada</span></div>
+  <div id="out"></div>
+  <div class="mt"><input id="q" type="search" placeholder="O escribe: nombre, principio activo o código SAP" autocomplete="off" aria-label="Buscar"></div>
+  <div id="sres"></div>
+</section>
+<section id="v-rec" hidden></section>
+<section id="v-ubic" hidden></section>
+<section id="v-cn" hidden></section>
+</main>
+<nav>
+  <button data-v="scan" aria-current="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8V5h3M17 5h3v3M20 16v3h-3M7 19H4v-3M7 12h10"/></svg>Escanear</button>
+  <button data-v="rec"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16v13H4zM4 7l2-3h12l2 3M9 12h6"/></svg><span id="recN">Recepción</span></button>
+  <button data-v="ubic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4zM4 10h16M4 15h16M12 4v16"/></svg>Ubicaciones</button>
+  <button data-v="cn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6v12M8 6v12M11 6v12M15 6v12M17 6v12M20 6v12"/></svg>Códigos CN</button>
+</nav>
+<script src="v/tesseract.min.js"></script>
+<script>
+{
+/* ---------- ubicaciones y grupos ---------- */
+const GROUPS={frio:'Neveras',cito:'Citostáticos',est:'Estupefacientes',amb:'Dispensación ambulatoria',gen:'Almacén general',top:'Pomadas, colirios y antisépticos',nut:'Sueros y nutrición',lab:'Laboratorio',warn:'Revisar ubicación'};
+const GORD=['frio','est','cito','amb','gen','top','nut','lab','warn'];
+const ZONES=[
+['A.F.',1,'Almacén fuera guía','gen'],['A.G.',2,'Almacén general','gen'],['M.E.',3,'Medicación extranjera','gen'],['A.U.',8,'Armario UPE · unidosis','gen'],['CON',13,'Contrastes','gen'],
+['N.E.',4,'Nutrición enteral','nut'],['A.S.',7,'Sueros','nut'],['NPT',21,'Nutrición parenteral','nut'],
+['A.P.',5,'Pomadas','top'],['COL',12,'Colirios y pomadas oftálmicas','top'],['ANT',9,'Antisépticos','top'],
+['ADM',null,'Almacén dispensación ambulatoria · NEA 136','amb'],
+['CIT',10,'Citostáticos parenterales (interior cabinas)','cito'],['CITO',null,'Citostáticos orales · pasillo NEA 305','cito'],
+['NEV',20,'Cámara frigorífica (med. general)','frio'],['NEA',null,'Nevera dispensación ambulatoria · NEA 136','frio'],['NECI',18,'Nevera citostáticos','frio'],['NECHDD',null,'Nevera citos consulta 305 · NEA','frio'],['NEI',17,'Nevera intravítreas + Aranesp + Curosurf + Xembify','frio'],['NEL',19,'Nevera laboratorio galénica','frio'],['CONG',14,'Congelador farmacia','frio'],
+['EST',15,'Estupefacientes','est'],['LAB',16,'Materias primas laboratorio','lab']];
+const Z={};ZONES.forEach((z,i)=>Z[z[0]]={code:z[0],num:z[1],name:z[2],g:z[3],ord:i});
+const zone=c=>Z[c]||{code:c,num:null,name:'Código que no aparece en el esquema',g:'warn',ord:99};
+const gcol=g=>`var(--${g})`;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $=s=>document.querySelector(s);
+const ls={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+/* ---------- datos ---------- */
+let MEDS=[],BY={},VOC={},IDF={};
+const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/(\d),(\d)/g,'$1.$2').replace(/(\d)(MG|MCG|ML|UI|G|MGR|KG|L|%)\b/g,'$1 $2').replace(/[^A-Z0-9.%]+/g,' ').replace(/(^|\s)\.+|\.+(\s|$)/g,' ').trim();
+const toks=s=>norm(s).split(' ').filter(t=>t.length>1||/\d/.test(t));
+const nameOf=m=>m.den||m.pa;
+let links=new Map(Object.entries(ls.get('cnLinks',{})));
+let rec=ls.get('recepcion',[]);
+fetch('meds.json').then(r=>r.json()).then(rows=>{
+  MEDS=rows.map((r,i)=>{const m={u:r[0],pa:r[1],den:r[2],sap:r[3],note:r[4]};m.k=m.sap||('x'+i);m.t=[...new Set(toks(m.pa+' '+m.den+' '+m.sap))];return m});
+  MEDS.forEach(m=>{BY[m.k]=m;m.t.forEach(t=>VOC[t]=(VOC[t]||0)+1)});
+  for(const t in VOC)IDF[t]=Math.log(1+MEDS.length/VOC[t]);
+  MEDS.forEach(m=>m.w=Math.sqrt(m.t.reduce((a,t)=>a+IDF[t],0)));
+  renderRec();renderUbic();renderCN();
+}).catch(()=>{$('#out').innerHTML='<div class="empty">No se ha podido cargar el listado.</div>'});
+
+function search(q){
+  const qt=toks(q);if(!qt.length)return[];const res=[];
+  for(const m of MEDS){let ok=true,ex=0;for(const t of qt){let hit=false;for(const v of m.t){if(v===t){hit=true;ex++;break}if(v.startsWith(t))hit=true}if(!hit){ok=false;break}}if(ok)res.push([ex,m])}
+  return res.sort((a,b)=>b[0]-a[0]||(a[1].pa+a[1].den).length-(b[1].pa+b[1].den).length).slice(0,40).map(x=>x[1]);
+}
+function lev(a,b,max){if(Math.abs(a.length-b.length)>max)return max+1;let p=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){const c=[i];let lo=i;for(let j=1;j<=b.length;j++){c[j]=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1));if(c[j]<lo)lo=c[j]}if(lo>max)return max+1;p=c}return p[b.length]}
+function matchText(text){
+  const Q=new Set(toks(text));if(!Q.size)return[];
+  const ql=[...Q].filter(t=>t.length>=4&&!/^\d/.test(t));const hit={};
+  for(const v in VOC){if(Q.has(v)){hit[v]=1;continue}if(v.length<5||/\d/.test(v))continue;const mx=v.length>=8?2:1;for(const q of ql){if(lev(v,q,mx)<=mx){hit[v]=.85;break}}}
+  const sc=[];
+  for(const m of MEDS){let s=0,named=0;for(const t of m.t)if(hit[t]){s+=IDF[t]*hit[t];if(!/\d/.test(t)&&IDF[t]>3)named=1}if(s>0&&named)sc.push({s:s/m.w,m})}
+  return sc.sort((a,b)=>b.s-a.s).slice(0,5);
+}
+
+/* ---------- vistas comunes ---------- */
+function chip(m){const z=zone(m.u);return `<span class="chip" style="--k:${gcol(z.g)}">${esc(m.u)}</span>`}
+function itemList(ms,act='show'){return `<ul class="list">${ms.map(m=>`<li><button class="item" data-act="${act}" data-k="${esc(m.k)}">${chip(m)}<span><span class="t">${esc(m.pa)}</span><span class="s">${esc(m.den||m.note)}${m.sap?' · SAP '+esc(m.sap):''}</span></span></button></li>`).join('')}</ul>`}
+function cnFor(k){for(const [c,v] of links)if(v.k===k)return c;return ''}
+function labelHTML(m,extra=''){
+  const z=zone(m.u),cn=cnFor(m.k);
+  return `<article class="label" style="--k:${gcol(z.g)}"><div class="g">${esc(GROUPS[z.g])}</div>
+  <div class="z">${chip(m)}<span>${z.num!=null?`<b>${z.num}</b> · `:''}${esc(z.name)}</span></div>
+  <div class="body"><div class="pa">${esc(m.pa)}</div><dl>${m.den?`<dt>Comercial</dt><dd>${esc(m.den)}</dd>`:''}${m.note?`<dt>Dónde</dt><dd>${esc(m.note)}</dd>`:''}${m.sap?`<dt>SAP</dt><dd>${esc(m.sap)}</dd>`:''}${cn?`<dt>CN</dt><dd>${esc(cn)}</dd>`:''}</dl>
+  <div class="row mt"><button class="pri" data-act="add" data-k="${esc(m.k)}">${(rec.find(x=>x.k===m.k)||{}).q?'+1 a recepción ('+rec.find(x=>x.k===m.k).q+')':'+1 a recepción'}</button><button data-act="next">Siguiente caja →</button>${extra}</div></div></article>`;
+}
+
+/* ---------- cámara en directo ---------- */
+let skipK=null,skipUntil=0,stream=null,track=null,ocr=null,ocrBusy=false,locked=null,loopT=null,bcT=null,hist=[],lastCN='',lastText='',torchOn=false;
+const detector=('BarcodeDetector' in window)?(()=>{try{return new BarcodeDetector({formats:['ean_13','data_matrix']})}catch(e){return null}})():null;
+const video=$('#video'),canvas=document.createElement('canvas');
+function state(t,on){$('#msg').textContent=t;$('#dot').classList.toggle('on',!!on)}
+async function startCam(){
+  if(!navigator.mediaDevices?.getUserMedia){state('Este navegador no permite usar la cámara. Abre la app en Chrome o Safari.');return}
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});
+    video.srcObject=stream;await video.play();track=stream.getVideoTracks()[0];
+    try{const cap=track.getCapabilities?.();if(cap?.torch)$('#torch').hidden=false;if(cap?.focusMode?.includes('continuous'))track.applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}
+    $('#off').hidden=true;$('#guide').hidden=false;$('#stop').hidden=false;
+    resume();
+    if(!ocr){state('Preparando el lector (solo la primera vez)…',true);
+      const base=new URL('v',location.href).href;
+      ocr=await Tesseract.createWorker('spa',1,{workerPath:base+'/worker.min.js',corePath:base,langPath:base,workerBlobURL:false,gzip:true});
+      await ocr.setParameters({tessedit_pageseg_mode:'11'});
+    }
+    if(!locked)state('Buscando… apunta al nombre del medicamento',true);
+  }catch(e){state(e&&e.name==='NotAllowedError'?'Has denegado la cámara. Permítela en los ajustes del navegador.':'No se pudo abrir la cámara.')}
+}
+function stopCam(){clearTimeout(loopT);clearInterval(bcT);if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;track=null;$('#off').hidden=false;$('#guide').hidden=true;$('#stop').hidden=true;$('#torch').hidden=true;state('Cámara apagada')}
+function resume(){locked=null;hist=[];lastCN='';clearInterval(bcT);if(detector)bcT=setInterval(scanBarcode,300);tick()}
+function frame(){const vw=video.videoWidth,vh=video.videoHeight;if(!vw)return null;
+  const sx=vw*.08,sy=vh*.18,sw=vw*.84,sh=vh*.64,sc=Math.min(1,1100/sw);canvas.width=sw*sc;canvas.height=sh*sc;
+  const c=canvas.getContext('2d',{willReadFrequently:true});c.filter='grayscale(1) contrast(1.4)';c.drawImage(video,sx,sy,sw,sh,0,0,canvas.width,canvas.height);return canvas}
+function cnFromBarcode(v){v=String(v).replace(/\D/g,'');let m;if(v.length===13&&v.startsWith('847000'))return v.slice(6,12);if((m=v.match(/^01(\d{14})/))&&m[1].startsWith('0847000'))return m[1].slice(7,13);const i=v.indexOf('08470');if(i>=0&&v.length>=i+14)return v.slice(i+7,i+13);return ''}
+const cnFromText=t=>{const m=String(t).match(/C\.?\s*N\.?\s*[:.]?\s*(\d{6})/i);return m?m[1]:''};
+async function scanBarcode(){if(locked||!stream||!detector||video.readyState<2)return;try{const r=await detector.detect(video);for(const b of r){const cn=cnFromBarcode(b.rawValue);if(cn){lastCN=cn;if(links.has(cn)&&BY[links.get(cn).k]){lock(links.get(cn).k,`Reconocido por el código de barras (CN ${cn})`)}return}}}catch(e){}}
+async function tick(){
+  clearTimeout(loopT);if(!stream||locked)return;
+  if(ocr&&!ocrBusy&&video.readyState>=2){
+    ocrBusy=true;
+    try{const f=frame();if(f){const {data}=await ocr.recognize(f);if(!locked&&stream)handleText(data.text)}}catch(e){}
+    ocrBusy=false;
+  }
+  loopT=setTimeout(tick,ocr?150:600);
+}
+function handleText(text){
+  const cn=cnFromText(text);if(cn){lastCN=cn;if(links.has(cn)&&BY[links.get(cn).k]){lock(links.get(cn).k,`Reconocido por su código nacional (CN ${cn})`);return}}
+  const c=matchText(text);lastText=text;
+  if(!c.length){skipK=null;hist.push(null);if(hist.length>4)hist.shift();if(hist.every(x=>x===null)&&hist.length===4){$('#out').innerHTML='';state('Buscando… acerca la caja y que se lea el nombre',true)}return}
+  if(skipK&&c[0].m.k===skipK&&Date.now()<skipUntil)return;
+  if(skipK&&c[0].m.k!==skipK)skipK=null;
+  const top=c[0],second=c[1];hist.push(top.m.k);if(hist.length>4)hist.shift();
+  const same=hist.slice(-2).every(k=>k===top.m.k)&&hist.length>=2;
+  const clear=!second||top.s>=second.s*1.25||(top.m.pa===second.m.pa&&top.m.u===second.m.u&&top.s>second.s*1.1);
+  if(same&&clear){lock(top.m.k,'Reconocido'+(lastCN?` · se guardará con el CN ${lastCN}`:''),true);return}
+  state('¿Es alguno de estos? Toca el correcto o sigue apuntando',true);
+  $('#out').innerHTML=itemList(c.slice(0,3).map(x=>x.m),'pick');
+}
+function lock(k,why,learn){
+  locked=k;clearInterval(bcT);clearTimeout(loopT);
+  if(learn&&lastCN&&!links.has(lastCN))link(lastCN,k);
+  state(why,false);try{navigator.vibrate&&navigator.vibrate(80)}catch(e){}
+  const alt=lastText?`<button data-act="alts">No es este</button>`:'';
+  $('#out').innerHTML=labelHTML(BY[k],alt);
+}
+function link(cn,k){const m=BY[k];links.set(cn,{k,n:nameOf(m)});ls.set('cnLinks',Object.fromEntries(links));renderCN()}
+$('#start').onclick=startCam;$('#stop').onclick=stopCam;
+$('#torch').onclick=async()=>{try{torchOn=!torchOn;await track.applyConstraints({advanced:[{torch:torchOn}]})}catch(e){}};
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&stream)stopCam()});
+
+let qT;$('#q').addEventListener('input',()=>{clearTimeout(qT);qT=setTimeout(()=>{const q=$('#q').value.trim();if(!q){$('#sres').innerHTML='';return}const r=search(q);$('#sres').innerHTML=r.length?itemList(r):'<div class="empty">Nada coincide. Prueba con menos palabras.</div>'},120)});
+
+/* ---------- acciones ---------- */
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act],[data-v]');if(!b)return;
+  if(b.dataset.v){go(b.dataset.v);return}
+  const a=b.dataset.act,k=b.dataset.k;
+  if(a==='show'){go('scan');locked=k;clearInterval(bcT);clearTimeout(loopT);state('Consulta manual',false);$('#out').innerHTML=labelHTML(BY[k]);$('#q').value='';$('#sres').innerHTML='';scrollTo({top:0})}
+  else if(a==='pick'){lock(k,'Elegido'+(lastCN?` · guardado con el CN ${lastCN}`:''),true)}
+  else if(a==='alts'){const c=matchText(lastText).map(x=>x.m).filter(m=>m.k!==locked);$('#out').innerHTML=c.length?'<p class="mut">Otras coincidencias:</p>'+itemList(c,'pick'):'<div class="empty">No hay otras coincidencias. Búscalo escribiendo abajo.</div>';if(lastCN&&links.get(lastCN)?.k===locked){links.delete(lastCN);ls.set('cnLinks',Object.fromEntries(links));renderCN()}locked=null}
+  else if(a==='add'){addRec(k);b.textContent='+1 a recepción ('+rec.find(x=>x.k===k).q+')'}
+  else if(a==='next'){skipK=locked;skipUntil=Date.now()+6000;$('#out').innerHTML='';stream?(resume(),state('Buscando la siguiente caja…',true)):state('Cámara apagada',false)}
+  else if(a==='inc'||a==='dec'){const r=rec.find(x=>x.k===k);if(!r)return;r.q=Math.max(0,r.q+(a==='inc'?1:-1));if(!r.q)rec=rec.filter(x=>x!==r);saveRec()}
+  else if(a==='clear'){if(b.dataset.sure){rec=[];saveRec()}else{b.dataset.sure=1;b.textContent='Toca otra vez para vaciar'}}
+  else if(a==='csv')exportCSV();
+  else if(a==='tsv')copy(table().map(r=>r.map(c=>String(c).replace(/\t|\n/g,' ')).join('\t')).join('\n'),b);
+  else if(a==='unlink'){links.delete(b.dataset.cn);ls.set('cnLinks',Object.fromEntries(links));renderCN()}
+  else if(a==='cpcn')copy(JSON.stringify(Object.fromEntries(links)),b);
+  else if(a==='impcn'){try{const o=JSON.parse($('#imp').value);let n=0;for(const c in o)if(/^\d{6}$/.test(c)&&o[c]&&BY[o[c].k]){links.set(c,{k:o[c].k,n:String(o[c].n||'')});n++}ls.set('cnLinks',Object.fromEntries(links));renderCN();$('#impMsg').textContent=n+' códigos importados.'}catch(err){$('#impMsg').textContent='El texto pegado no tiene el formato correcto.'}}
+  else if(a==='zone')openZone(b.dataset.z);
+  else if(a==='zback')renderUbic();
+});
+document.addEventListener('change',e=>{if(e.target.dataset.done){const r=rec.find(x=>x.k===e.target.dataset.done);if(r){r.d=e.target.checked;saveRec()}}});
+function go(v){if(v!=='scan'&&stream)stopCam();['scan','rec','ubic','cn'].forEach(x=>$('#v-'+x).hidden=x!==v);document.querySelectorAll('nav button').forEach(n=>n.setAttribute('aria-current',n.dataset.v===v));scrollTo({top:0})}
+
+/* ---------- recepción ---------- */
+function addRec(k){const r=rec.find(x=>x.k===k);if(r)r.q++;else rec.push({k,q:1,d:false});saveRec()}
+function saveRec(){ls.set('recepcion',rec);renderRec()}
+function recRows(){return rec.map(r=>({...r,m:BY[r.k]})).filter(r=>r.m).sort((a,b)=>GORD.indexOf(zone(a.m.u).g)-GORD.indexOf(zone(b.m.u).g)||zone(a.m.u).ord-zone(b.m.u).ord||a.m.pa.localeCompare(b.m.pa))}
+function renderRec(){
+  const rows=recRows(),n=rows.reduce((a,r)=>a+r.q,0);$('#recN').textContent=n?`Recepción (${n})`:'Recepción';
+  if(!rows.length){$('#v-rec').innerHTML='<h2>Recepción</h2><div class="empty">Aún no hay nada. Escanea un medicamento y pulsa «+1 a recepción» (una vez por unidad). Aquí lo verás agrupado por ubicación para colocarlo en un solo recorrido.</div>';return}
+  let h=`<h2>Recepción</h2><p class="mut">${rows.length} producto${rows.length>1?'s':''} · ${n} unidad${n>1?'es':''}</p><div class="row"><button data-act="csv">Descargar Excel (CSV)</button><button data-act="tsv">Copiar para Excel</button><button data-act="clear">Vaciar</button></div>`,g=null,u=null;
+  for(const r of rows){const z=zone(r.m.u);
+    if(z.g!==g){g=z.g;u=null;h+=`<div class="ghead" style="--k:${gcol(g)}">${esc(GROUPS[g])}</div>`}
+    if(z.code!==u){u=z.code;h+=`<div class="sub">${chip(r.m)}${esc(z.name)}</div>`}
+    h+=`<div class="rec${r.d?' done':''}"><div><span class="t" style="font-weight:700">${esc(r.m.pa)}</span><div class="mut">${esc(r.m.den||r.m.note)}${r.m.sap?' · SAP '+esc(r.m.sap):''}</div><label class="chk"><input type="checkbox" data-done="${esc(r.k)}"${r.d?' checked':''}>Colocado</label></div><div class="qty"><button data-act="dec" data-k="${esc(r.k)}" aria-label="Menos">−</button><span>${r.q}</span><button data-act="inc" data-k="${esc(r.k)}" aria-label="Más">+</button></div></div>`}
+  $('#v-rec').innerHTML=h;
+}
+function table(){const d=new Date().toLocaleString('es-ES');return [['Grupo','Ubicación','Descripción ubicación','Principio activo','Denominación comercial','Código SAP','CN','Cantidad','Colocado','Fecha'],...recRows().map(r=>{const z=zone(r.m.u);return[GROUPS[z.g],r.m.u,z.name,r.m.pa,r.m.den||r.m.note,r.m.sap,cnFor(r.k),r.q,r.d?'Sí':'No',d]})]}
+function exportCSV(){const csv='﻿'+table().map(r=>r.map(c=>{c=String(c);return /[;"\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c}).join(';')).join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='recepcion_'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
+async function copy(t,b){const o=b.textContent;try{await navigator.clipboard.writeText(t);b.textContent='✓ Copiado'}catch(e){b.textContent='No se pudo copiar'}setTimeout(()=>b.textContent=o,1800)}
+
+/* ---------- ubicaciones ---------- */
+function renderUbic(){
+  const cnt={};MEDS.forEach(m=>cnt[m.u]=(cnt[m.u]||0)+1);
+  const codes=[...ZONES.map(z=>z[0]),...Object.keys(cnt).filter(c=>!Z[c])];
+  let h='<h2>Ubicaciones</h2>';
+  for(const g of GORD){const cs=codes.filter(c=>zone(c).g===g);if(!cs.length)continue;const tot=cs.reduce((a,c)=>a+(cnt[c]||0),0);
+    h+=`<div class="ghead" style="--k:${gcol(g)}">${esc(GROUPS[g])}<span style="margin-left:auto;font-size:14px;font-weight:600">${tot}</span></div><ul class="list" style="border:0">${cs.map(c=>{const z=zone(c);return `<li><button class="item" data-act="zone" data-z="${esc(c)}"><span class="chip" style="--k:${gcol(g)}">${esc(c)}</span><span><span class="t">${z.num!=null?z.num+' · ':''}${esc(z.name)}</span><span class="s">${cnt[c]||0} medicamentos</span></span></button></li>`}).join('')}</ul>`}
+  h+=`<p class="note mt">En el listado aparecen <b>NEVA</b> y <b>A.M.</b>, que no están en el esquema. Puede ser una errata; conviene confirmarlo.</p>`;
+  $('#v-ubic').innerHTML=h;
+}
+function openZone(c){const z=zone(c),ms=MEDS.filter(m=>m.u===c).sort((a,b)=>a.pa.localeCompare(b.pa));
+  $('#v-ubic').innerHTML=`<div class="row mt"><button data-act="zback">← Ubicaciones</button></div><h2>${esc(GROUPS[z.g])} · ${esc(c)}</h2><p class="mut">${esc(z.name)}</p><input id="zf" type="search" placeholder="Filtrar en esta ubicación" aria-label="Filtrar"><div id="zlist">${itemList(ms)}</div>`;
+  $('#zf').addEventListener('input',e=>{const qt=toks(e.target.value);$('#zlist').innerHTML=itemList(ms.filter(m=>qt.every(t=>m.t.some(v=>v.startsWith(t)))))});scrollTo({top:0})}
+
+/* ---------- códigos CN ---------- */
+function renderCN(){
+  const arr=[...links].map(([c,v])=>[c,BY[v.k]]).filter(x=>x[1]);
+  $('#v-cn').innerHTML=`<h2>Códigos nacionales aprendidos</h2>
+  <p>El listado no trae el CN, así que la app lo aprende: cuando reconoce una caja (o eliges el medicamento correcto) y ha leído su CN o su código de barras, lo guarda. La próxima vez esa caja se reconoce al instante.</p>
+  <p class="mut">${arr.length} códigos guardados en este móvil.</p>
+  ${arr.length?`<ul class="list">${arr.map(([c,m])=>`<li class="row" style="padding:8px 0;justify-content:space-between"><span>${chip(m)} <b>CN ${esc(c)}</b> · ${esc(m.pa)}</span><button data-act="unlink" data-cn="${esc(c)}">Quitar</button></li>`).join('')}</ul>`:''}
+  <h2>Pasar los códigos a otro móvil</h2><div class="row"><button data-act="cpcn">Copiar códigos</button></div>
+  <p class="mut mt">En el otro móvil, pega aquí el texto copiado:</p><textarea id="imp" aria-label="Pegar códigos"></textarea><div class="row mt"><button data-act="impcn">Importar</button><span id="impMsg" class="mut"></span></div>`;
+}
+if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
