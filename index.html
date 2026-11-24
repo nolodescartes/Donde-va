@@ -76,6 +76,14 @@ nav svg{width:24px;height:24px}
 .gcard .gi{width:52px;height:52px;border-radius:16px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;flex:none}
 .gcard[data-g=ag] .gi{background:#1B1400;color:#F2C500}
 .gcard .gn{font-family:var(--disp);font-weight:800;font-size:20px;flex:1}
+.shead{display:flex;align-items:center;gap:10px;width:100%;background:var(--k);color:var(--kf,#fff);border:0;border-radius:12px;padding:6px 10px 6px 6px;min-height:44px;text-align:left;margin-top:6px}
+.shead .sc{font-family:var(--disp);font-weight:800;font-size:13px;flex:none;min-width:52px;text-align:center;padding:5px 6px;border-radius:8px;background:rgba(255,255,255,.22);letter-spacing:.02em}
+.gk-ag .shead .sc{background:rgba(27,20,0,.1)}
+.shead .sn{flex:1;font-weight:600;font-size:14px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shead .sq{font-size:12px;font-weight:600;opacity:.8}
+.shead svg{flex:none;width:18px;height:18px;transition:transform .2s}.shead[aria-expanded=true] svg{transform:rotate(90deg)}
+.shead[aria-expanded=true]{border-radius:12px 12px 4px 4px}
+.sbody{margin:2px 0 8px}
 .subs{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
 .subs button{min-height:40px;font-size:14px;padding:6px 12px;border-radius:999px}
 .subs button[aria-pressed=true]{background:var(--k);color:var(--kf,#fff);border-color:transparent}
@@ -319,7 +327,7 @@ document.addEventListener('click',e=>{
   else if(a==='hojalink')copy(location.origin+location.pathname+'?hoja='+encodeURIComponent(cfg.url)+'&clave='+encodeURIComponent(cfg.clave),b);
   else if(a==='hojaoff'){cfg={url:'',clave:''};ls.set('hoja',cfg);renderCN()}
   else if(a==='grp')openGroup(b.dataset.g);
-  else if(a==='zsel'){zsel=b.dataset.z;drawGroup()}
+  else if(a==='ztog'){const z=b.dataset.z;zopen.has(z)?zopen.delete(z):zopen.add(z);drawGroup()}
   else if(a==='zback')renderUbic();
 });
 function go(v){
@@ -336,21 +344,27 @@ async function copy(t,b){const o=b.textContent;try{await navigator.clipboard.wri
 function renderUbic(){
   $('#v-ubic').innerHTML='<h2 style="margin-top:4px">Ubicaciones</h2>'+GORD.filter(g=>g!=='warn').map(g=>`<button class="gcard" data-act="grp" data-g="${g}" style="--k:${gcol(g)}"><span class="gi">${svgI(g,30)}</span><span class="gn">${esc(GROUPS[g])}</span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>`).join('');
 }
-let curG=null,zsel='all';
-function openGroup(g){curG=g;zsel='all';
+let curG=null,zsel='all',zopen=new Set();
+function openGroup(g){curG=g;zsel='all';zopen=new Set();
   $('#v-ubic').innerHTML=`<div class="row"><button data-act="zback">← Ubicaciones</button></div>
-  <button class="gcard" style="--k:${gcol(g)};cursor:default" tabindex="-1"><span class="gi">${svgI(g,30)}</span><span class="gn">${esc(GROUPS[g])}</span></button>
-  <div class="subs" id="subs" style="--k:${gcol(g)}"></div>
-  <div class="searchbox"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0B5D3B" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="zf" type="search" placeholder="Filtrar en ${esc(GROUPS[g])}" aria-label="Filtrar"></div>
-  <div id="zlist"></div>`;
+  <button class="gcard" data-g="${g}" style="--k:${gcol(g)};cursor:default" tabindex="-1"><span class="gi">${svgI(g,30)}</span><span class="gn">${esc(GROUPS[g])}</span></button>
+  <div class="searchbox" style="margin-top:12px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0B5D3B" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="zf" type="search" placeholder="Filtrar en ${esc(GROUPS[g])}" aria-label="Filtrar"></div>
+  <div id="zlist" class="gk-${g}" style="--k:${gcol(g)}"></div>`;
   $('#zf').addEventListener('input',drawGroup);drawGroup();scrollTo({top:0});
 }
 function drawGroup(){
-  const g=curG,codes=ZONES.filter(z=>z[3]===g).map(z=>z[0]),cnt={};MEDS.forEach(m=>cnt[m.u]=(cnt[m.u]||0)+1);
-  $('#subs').innerHTML=[`<button data-act="zsel" data-z="all" aria-pressed="${zsel==='all'}">Todas</button>`,...codes.map(c=>`<button data-act="zsel" data-z="${esc(c)}" aria-pressed="${zsel===c}">${esc(c)} · ${esc(zone(c).name)} (${cnt[c]||0})</button>`)].join('');
-  const qt=toks(($('#zf')||{}).value||'');
-  const ms=MEDS.filter(m=>(zsel==='all'?codes.includes(m.u):m.u===zsel)&&qt.every(t=>m.t.some(v=>v.startsWith(t)))).sort((a,b)=>a.pa.localeCompare(b.pa));
-  $('#zlist').innerHTML=ms.length?itemList(ms.slice(0,300))+(ms.length>300?`<p class="mut">Mostrando 300 de ${ms.length}. Filtra para ver el resto.</p>`:''):'<div class="empty">Nada coincide.</div>';
+  const g=curG,codes=ZONES.filter(z=>z[3]===g).map(z=>z[0]);
+  const qt=toks(($('#zf')||{}).value||''),filt=qt.length>0;
+  const chev='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
+  let h='',any=false;
+  for(const c of codes){
+    const all=MEDS.filter(m=>m.u===c),ms=all.filter(m=>qt.every(t=>m.t.some(v=>v.startsWith(t)))).sort((a,b)=>a.pa.localeCompare(b.pa));
+    if(filt&&!ms.length)continue;any=true;
+    const z=zone(c),open=filt||zopen.has(c);
+    h+=`<button class="shead" data-act="ztog" data-z="${esc(c)}" aria-expanded="${open}"><span class="sc">${esc(c)}</span><span class="sn">${z.num!=null?'Zona '+z.num+' · ':''}${esc(z.name)}</span><span class="sq">${filt?ms.length+' de '+all.length:all.length}</span>${chev}</button>`;
+    if(open)h+=`<div class="sbody">${itemList(ms)}</div>`;
+  }
+  $('#zlist').innerHTML=any?h:'<div class="empty">Nada coincide.</div>';
 }
 
 /* ---------- verificación con CIMA (AEMPS) ---------- */
