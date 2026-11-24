@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
 :root{color-scheme:light dark;--bg:light-dark(#ffffff,#0e1519);--ink:light-dark(#13202b,#e8eef2);--mut:light-dark(#5b6b77,#9aabb7);--line:light-dark(#dde4e9,#25323b);--soft:light-dark(#f2f6f8,#152027);--pri:light-dark(#0a5c7a,#5fb6d6);--pri-ink:light-dark(#fff,#06202b);--acc:#ff6a3d;
---frio:light-dark(#1d6fd1,#6aa9f5);--est:light-dark(#c62828,#ff7a7a);--cito:light-dark(#7b3fa0,#c897e8);--amb:light-dark(#00796b,#4fd1bf);--gen:light-dark(#3b4a56,#b7c6d1);--top:light-dark(#b0570b,#f5a55c);--nut:light-dark(#2e7d32,#7fd483);--lab:light-dark(#5d4037,#c9a99c);--warn:light-dark(#a35f00,#f0b44c)}
+--ag:#f2c500;--upe:#2e9e3f;--cab:#1e9bd7;--hdd:#c2187a;--mor:#e5531a;--warn:light-dark(#a35f00,#f0b44c)}
 *{box-sizing:border-box;min-width:0}[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow-x:clip;padding-bottom:calc(72px + env(safe-area-inset-bottom))}
 header{background:var(--pri);color:var(--pri-ink);padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;gap:10px}
@@ -33,14 +33,14 @@ h2{font-size:20px;margin:18px 0 8px}
 .dot{width:10px;height:10px;border-radius:50%;background:var(--mut);flex:none}.dot.on{background:#2fbf71;animation:p 1.2s infinite}
 @keyframes p{50%{opacity:.3}}
 .label{border:2px solid var(--k);border-radius:14px;overflow:hidden;margin-top:12px}
-.label .g{background:var(--k);color:var(--bg);padding:12px 16px;font-size:clamp(26px,8vw,40px);font-weight:800;line-height:1.05}
+.label .g{background:var(--k);color:var(--kf,#fff);padding:12px 16px;font-size:clamp(26px,8vw,40px);font-weight:800;line-height:1.05}
 .label .z{display:flex;gap:10px;align-items:center;padding:10px 16px;background:color-mix(in srgb,var(--k) 12%,var(--bg))}
 .label .z b{font-size:22px}
 .label .body{padding:10px 16px 14px}.label .pa{font-size:18px;font-weight:700}
 .label dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;margin:6px 0 0;font-size:15px}.label dt{color:var(--mut)}.label dd{margin:0;overflow-wrap:anywhere}
 .list{list-style:none;margin:6px 0 0;padding:0;border-top:1px solid var(--line)}.list li{border-bottom:1px solid var(--line)}
 .item{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:none;border:0;border-radius:0;padding:10px 4px;justify-content:flex-start}
-.chip{flex:none;min-width:58px;text-align:center;font-weight:700;font-size:13px;padding:5px 7px;border-radius:8px;color:var(--bg);background:var(--k)}
+.chip{flex:none;min-width:58px;text-align:center;font-weight:700;font-size:13px;padding:5px 7px;border-radius:8px;color:var(--kf,#fff);background:var(--k)}
 .item .t{display:block;font-weight:700;font-size:15px}.item .s{display:block;color:var(--mut);font-size:14px}
 nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--bg);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:5}
 nav button{border:0;border-radius:0;background:none;min-height:60px;font-size:13px;flex-direction:column;gap:2px;color:var(--mut)}
@@ -50,7 +50,7 @@ nav svg{width:22px;height:22px}
 .rec{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
 .rec.done .t{text-decoration:line-through;color:var(--mut)}
 .chk{display:flex;align-items:center;gap:8px;font-size:14px}.chk input{width:22px;height:22px}
-.ghead{display:flex;align-items:center;gap:10px;margin-top:18px;padding:8px 12px;border-radius:10px;background:var(--k);color:var(--bg);font-weight:800;font-size:18px}
+.ghead{display:flex;align-items:center;gap:10px;margin-top:18px;padding:8px 12px;border-radius:10px;background:var(--k);color:var(--kf,#fff);font-weight:800;font-size:18px}
 .sub{margin:10px 0 0;font-weight:700;font-size:15px;display:flex;gap:8px;align-items:center}
 .note{border-left:4px solid var(--warn);padding:8px 12px;background:var(--soft);border-radius:0 8px 8px 0;font-size:15px}
 .empty{padding:18px;text-align:center;color:var(--mut);border:1px dashed var(--line);border-radius:12px;margin-top:12px}
@@ -86,19 +86,17 @@ nav svg{width:22px;height:22px}
 <script>
 {
 /* ---------- ubicaciones y grupos ---------- */
-const GROUPS={frio:'Neveras',cito:'Citostáticos',est:'Estupefacientes',amb:'Dispensación ambulatoria',gen:'Almacén general',top:'Pomadas, colirios y antisépticos',nut:'Sueros y nutrición',lab:'Laboratorio',warn:'Revisar ubicación'};
-const GORD=['frio','est','cito','amb','gen','top','nut','lab','warn'];
+const GROUPS={ag:'Almacén General',upe:'UPE',cab:'Cabinas',hdd:'Hospital de Día (HDD)',mor:'Mórficos',warn:'Revisar ubicación'};
+const GORD=['ag','upe','cab','hdd','mor','warn'];
 const ZONES=[
-['A.F.',1,'Almacén fuera guía','gen'],['A.G.',2,'Almacén general','gen'],['M.E.',3,'Medicación extranjera','gen'],['A.U.',8,'Armario UPE · unidosis','gen'],['CON',13,'Contrastes','gen'],
-['N.E.',4,'Nutrición enteral','nut'],['A.S.',7,'Sueros','nut'],['NPT',21,'Nutrición parenteral','nut'],
-['A.P.',5,'Pomadas','top'],['COL',12,'Colirios y pomadas oftálmicas','top'],['ANT',9,'Antisépticos','top'],
-['ADM',null,'Almacén dispensación ambulatoria · NEA 136','amb'],
-['CIT',10,'Citostáticos parenterales (interior cabinas)','cito'],['CITO',null,'Citostáticos orales · pasillo NEA 305','cito'],
-['NEV',20,'Cámara frigorífica (med. general)','frio'],['NEA',null,'Nevera dispensación ambulatoria · NEA 136','frio'],['NECI',18,'Nevera citostáticos','frio'],['NECHDD',null,'Nevera citos consulta 305 · NEA','frio'],['NEI',17,'Nevera intravítreas + Aranesp + Curosurf + Xembify','frio'],['NEL',19,'Nevera laboratorio galénica','frio'],['CONG',14,'Congelador farmacia','frio'],
-['EST',15,'Estupefacientes','est'],['LAB',16,'Materias primas laboratorio','lab']];
+['A.G.',2,'Almacén general','ag'],['A.F.',1,'Almacén fuera guía','ag'],['M.E.',3,'Medicación extranjera','ag'],['N.E.',4,'Nutrición enteral','ag'],['A.P.',5,'Pomadas','ag'],['A.S.',7,'Sueros','ag'],['A.U.',7,'Sueros · A.U.','ag'],['ANT',9,'Antisépticos','ag'],['COL',12,'Colirios y pomadas oftálmicas','ag'],['CON',13,'Contrastes','ag'],['CONG',14,'Congelador farmacia','ag'],['NEV',20,'Cámara frigorífica (med. general)','ag'],['NPT',21,'Nutrición parenteral','ag'],
+['UPE',8,'Armario medicación UPE · unidosis','upe'],['ADM',null,'Dispensación ambulatoria · edificio NEA 136','upe'],['NEA',null,'Nevera dispensación ambulatoria · NEA 136','upe'],['NEI',17,'Nevera intravítreas + Aranesp + Curosurf + Xembify','upe'],['NEL',19,'Nevera laboratorio galénica','upe'],
+['CIT',10,'Citostáticos parenterales (interior cabinas)','cab'],['LAB',16,'Materias primas laboratorio','cab'],['NECI',18,'Nevera citostáticos','cab'],
+['CITO',null,'Citostáticos orales · pasillo NEA 305','hdd'],['NECHDD',null,'Nevera citos consulta 305 · NEA','hdd'],
+['EST',15,'Estupefacientes','mor']];
 const Z={};ZONES.forEach((z,i)=>Z[z[0]]={code:z[0],num:z[1],name:z[2],g:z[3],ord:i});
 const zone=c=>Z[c]||{code:c,num:null,name:'Código que no aparece en el esquema',g:'warn',ord:99};
-const gcol=g=>`var(--${g})`;
+const gcol=g=>`var(--${g})`+(g==='ag'||g==='warn'?';--kf:#1b1400':'');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const $=s=>document.querySelector(s);
 const ls={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
@@ -258,7 +256,7 @@ function renderUbic(){
   const codes=[...ZONES.map(z=>z[0]),...Object.keys(cnt).filter(c=>!Z[c])];
   let h='<h2>Ubicaciones</h2>';
   for(const g of GORD){const cs=codes.filter(c=>zone(c).g===g);if(!cs.length)continue;const tot=cs.reduce((a,c)=>a+(cnt[c]||0),0);
-    h+=`<div class="ghead" style="--k:${gcol(g)}">${esc(GROUPS[g])}<span style="margin-left:auto;font-size:14px;font-weight:600">${tot}</span></div><ul class="list" style="border:0">${cs.map(c=>{const z=zone(c);return `<li><button class="item" data-act="zone" data-z="${esc(c)}"><span class="chip" style="--k:${gcol(g)}">${esc(c)}</span><span><span class="t">${z.num!=null?z.num+' · ':''}${esc(z.name)}</span><span class="s">${cnt[c]||0} medicamentos</span></span></button></li>`}).join('')}</ul>`}
+    h+=`<div class="ghead" style="--k:${gcol(g)}">${esc(GROUPS[g])}<span style="margin-left:auto;font-size:14px;font-weight:600">${tot}</span></div><ul class="list" style="border:0">${cs.map(c=>{const z=zone(c);return `<li><button class="item" data-act="zone" data-z="${esc(c)}"><span class="chip" style="--k:${gcol(g)}">${esc(c)}</span><span><span class="t">${z.num!=null?z.num+' · ':''}${esc(z.name)}</span><span class="s">${cnt[c]||0} medicamento${(cnt[c]||0)===1?"":"s"}</span></span></button></li>`}).join('')}</ul>`}
   h+=`<p class="note mt">En el listado aparecen <b>NEVA</b> y <b>A.M.</b>, que no están en el esquema. Puede ser una errata; conviene confirmarlo.</p>`;
   $('#v-ubic').innerHTML=h;
 }

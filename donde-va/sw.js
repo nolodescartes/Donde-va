@@ -1,5 +1,5 @@
 // Guarda la app para que funcione sin conexión. Cambia VERSION al actualizar el listado.
-const VERSION = 'dondeva-1';
+const VERSION = 'dondeva-2';
 const CORE = ['./', 'index.html', 'meds.json', 'manifest.webmanifest', 'icon-192.png', 'v/tesseract.min.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(CORE))); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSION).map(k => caches.delete(k))))); self.clients.claim(); });
