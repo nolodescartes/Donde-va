@@ -119,7 +119,7 @@ fetch('meds.json').then(r=>r.json()).then(rows=>{
   MEDS.forEach(m=>{BY[m.k]=m;m.t.forEach(t=>VOC[t]=(VOC[t]||0)+1)});
   for(const t in VOC)IDF[t]=Math.log(1+MEDS.length/VOC[t]);
   MEDS.forEach(m=>m.w=Math.sqrt(m.t.reduce((a,t)=>a+IDF[t],0)));
-  renderRec();renderUbic();renderCN();
+  renderRec();renderUbic();renderCN();flush();
 }).catch(()=>{$('#out').innerHTML='<div class="empty">No se ha podido cargar el listado.</div>'});
 
 function search(q){
@@ -232,7 +232,7 @@ function lock(k,why){
 }
 function link(cn,k){
   for(const [c,v] of [...links])if(v.k===k&&c!==cn)links.delete(c);
-  links.set(cn,{k,n:nameOf(BY[k])});ls.set('cnLinks',Object.fromEntries(links));renderCN();
+  links.set(cn,{k,n:nameOf(BY[k])});ls.set('cnLinks',Object.fromEntries(links));renderCN();queueSave(cn,k);
 }
 $('#start').onclick=startCam;$('#stop').onclick=stopCam;
 $('#torch').onclick=async()=>{try{torchOn=!torchOn;await track.applyConstraints({advanced:[{torch:torchOn}]})}catch(e){}};
@@ -258,10 +258,11 @@ document.addEventListener('click',e=>{
   else if(a==='cnpick'){link(pendingCN,k);$('#cnout').innerHTML=`<div class="ok">✓ CN <b>${esc(pendingCN)}</b> asignado a <b>${esc(BY[k].pa)}</b> (SAP ${esc(BY[k].sap)})</div>${cimaSlot(pendingCN,k)}<div class="row mt"><button class="pri" data-act="cnnext">Escanear otra caja</button></div>`;pendingCN=''}
   else if(a==='cnnext'){pendingCN='';lastText='';$('#cnout').innerHTML='';stream?(resume(),state('Apunta al código cuadrado de la caja',true)):startCam()}
   else if(a==='cnmanual'){const v=($('#cnin').value||'').replace(/\D/g,'').slice(0,6);if(v.length!==6){$('#cnin').focus();return}pendingCN=v;locked='cn';clearInterval(bcT);clearTimeout(loopT);cnPanel()}
-  else if(a==='unlink'){links.delete(b.dataset.cn);ls.set('cnLinks',Object.fromEntries(links));renderCN()}
-  else if(a==='cncsv')exportCSV([['CN','Código SAP','Principio activo','Denominación comercial','Ubicación','Grupo'],...[...links].filter(([c,v])=>BY[v.k]).map(([c,v])=>{const m=BY[v.k],z=zone(m.u);return[c,m.sap,m.pa,m.den,m.u,GROUPS[z.g]]})],'cn_sap');
-  else if(a==='cpcn')copy(JSON.stringify(Object.fromEntries(links)),b);
-  else if(a==='impcn'){try{const o=JSON.parse($('#imp').value);let n=0;for(const c in o)if(/^\d{6}$/.test(c)&&o[c]&&BY[o[c].k]){links.set(c,{k:o[c].k,n:String(o[c].n||'')});n++}ls.set('cnLinks',Object.fromEntries(links));renderCN();$('#impMsg').textContent=n+' códigos importados.'}catch(err){$('#impMsg').textContent='El texto pegado no tiene el formato correcto.'}}
+  else if(a==='unlink'){if(b.dataset.sure){links.delete(b.dataset.cn);ls.set('cnLinks',Object.fromEntries(links));renderCN();queueRemove(b.dataset.cn)}else{b.dataset.sure=1;b.textContent='¿Seguro?'}}
+  else if(a==='hojasave'){cfg={url:$('#hurl').value.trim(),clave:$('#hclave').value.trim()};ls.set('hoja',cfg);if(!hojaOK()){syncErr='El enlace debe empezar por https://script.google.com/ y hace falta la clave.';renderCN();return}for(const [c,v] of links)if(!queue.some(o=>o.cn===c))queueSave(c,v.k);flush()}
+  else if(a==='hojasync')flush();
+  else if(a==='hojalink')copy(location.origin+location.pathname+'?hoja='+encodeURIComponent(cfg.url)+'&clave='+encodeURIComponent(cfg.clave),b);
+  else if(a==='hojaoff'){cfg={url:'',clave:''};ls.set('hoja',cfg);renderCN()}
   else if(a==='zone')openZone(b.dataset.z);
   else if(a==='zback')renderUbic();
 });
@@ -270,6 +271,7 @@ function go(v){
   if(stream)stopCam();locked=null;pendingCN='';
   ['scan','rec','ubic','cn'].forEach(x=>$('#v-'+x).hidden=x!==v);document.querySelectorAll('nav button').forEach(n=>n.setAttribute('aria-current',n.dataset.v===v));
   if(v==='cn'||v==='scan'){mode=v;$(v==='cn'?'#cnslot':'#scanslot').appendChild($('#camwrap'));$('#offmsg').textContent=v==='cn'?'Apunta al código cuadrado de la caja (junto a Lote/CAD)':'Apunta al nombre del medicamento dentro del recuadro';$('#out').innerHTML='';$('#cnout').innerHTML='';}
+  if(v==='cn')flush();
   scrollTo({top:0});
 }
 
@@ -350,6 +352,37 @@ function fillCima(){
 }
 new MutationObserver(()=>fillCima()).observe(document.body,{childList:true,subtree:true});
 
+/* ---------- hoja compartida (Google Sheets) ---------- */
+let cfg=ls.get('hoja',{url:'',clave:''}),queue=ls.get('colaHoja',[]),lastSync=0,syncing=false,syncErr='';
+(()=>{try{const p=new URLSearchParams(location.search);if(p.get('hoja')){cfg={url:p.get('hoja'),clave:p.get('clave')||''};ls.set('hoja',cfg);history.replaceState(null,'',location.pathname)}}catch(e){}})();
+const hojaOK=()=>/^https:\/\/script\.google(usercontent)?\.com\//.test(cfg.url)&&cfg.clave;
+async function queueSave(cn,k){
+  const m=BY[k];if(!m)return;const z=zone(m.u);let ci='',ck='';
+  try{const r=await cima(cn);if(r.nombre){ci=r.nombre;const v=compare(r,m);ck=v==='ok'?'Coincide':v==='dose'?'Dosis distinta':'No coincide'}else if(r.none)ck='No está en CIMA'}catch(e){}
+  queue=queue.filter(o=>o.cn!==cn);queue.push({accion:'guardar',cn,k,sap:m.sap,pa:m.pa,den:m.den||m.note,ubic:m.u,grupo:GROUPS[z.g],cima:ci,check:ck});
+  ls.set('colaHoja',queue);flush();
+}
+function queueRemove(cn){queue=queue.filter(o=>o.cn!==cn);queue.push({accion:'quitar',cn});ls.set('colaHoja',queue);flush()}
+async function flush(){
+  if(!hojaOK()||syncing)return;syncing=true;
+  try{
+    while(queue.length){
+      const op=queue[0];
+      const r=await fetch(cfg.url,{method:'POST',body:JSON.stringify({...op,clave:cfg.clave})});
+      const j=await r.json();if(!j.ok)throw new Error(j.error==='clave'?'La clave no coincide con la de la hoja.':'La hoja no ha aceptado el dato.');
+      queue.shift();ls.set('colaHoja',queue);
+    }
+    const r=await fetch(cfg.url+(cfg.url.includes('?')?'&':'?')+'clave='+encodeURIComponent(cfg.clave));
+    const j=await r.json();if(!j.ok)throw new Error(j.error==='clave'?'La clave no coincide con la de la hoja.':'No se ha podido leer la hoja.');
+    const nl=new Map();for(const f of j.filas||[]){const cn=String(f.cn).replace(/\D/g,'').padStart(6,'0').slice(-6);if(BY[f.k])nl.set(cn,{k:f.k,n:nameOf(BY[f.k])})}
+    for(const op of queue){if(op.accion==='guardar')nl.set(op.cn,{k:op.k,n:nameOf(BY[op.k])});else nl.delete(op.cn)}
+    links=nl;ls.set('cnLinks',Object.fromEntries(links));lastSync=Date.now();syncErr='';
+  }catch(e){syncErr=e&&e.message&&!/fetch|network|json/i.test(e.message)?e.message:'Sin conexión con la hoja. Se guardará cuando vuelva la conexión.'}
+  syncing=false;renderCN();
+}
+setInterval(()=>{if(!document.hidden)flush()},120000);
+window.addEventListener('online',flush);
+
 /* ---------- códigos CN ---------- */
 function cnPanel(){
   const cn=pendingCN,cur=links.get(cn),m=cur&&BY[cur.k];
@@ -369,9 +402,12 @@ function renderCN(){
   $('#cnlist').innerHTML=`<h2>Escribir un CN a mano</h2><div class="row"><input id="cnin" type="search" inputmode="numeric" placeholder="6 dígitos, p. ej. 755348" style="flex:1;min-width:10em" aria-label="CN"><button data-act="cnmanual">Asignar</button></div>
   <h2>CN asignados (${arr.length} de ${MEDS.length})</h2>
   ${arr.length?`<ul class="list">${arr.map(([c,m])=>`<li class="row" style="padding:8px 0;justify-content:space-between"><span>${chip(m)} <b>CN: ${esc(c)}</b> · SAP: ${esc(m.sap)}<br><span class="mut">${esc(m.pa)}</span></span><button data-act="unlink" data-cn="${esc(c)}">Quitar</button></li>`).join('')}</ul>`:'<div class="empty">Todavía no hay ninguno.</div>'}
-  <div class="row mt"><button data-act="cncsv">Descargar lista CN–SAP (Excel)</button></div>
-  <h2>Pasar los CN a otro móvil</h2><div class="row"><button data-act="cpcn">Copiar códigos</button></div>
-  <p class="mut mt">En el otro móvil, pega aquí el texto copiado:</p><textarea id="imp" aria-label="Pegar códigos"></textarea><div class="row mt"><button data-act="impcn">Importar</button><span id="impMsg" class="mut"></span></div>`;
+  <h2>Hoja compartida</h2>
+  ${hojaOK()?`<div class="${syncErr?'note':'ok'}">${syncErr?esc(syncErr):'✓ Conectada a la hoja de Google. Los CN se guardan allí y se comparten con quien use la misma hoja.'}<br><span class="mut">${lastSync?'Última sincronización: '+new Date(lastSync).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'Sin sincronizar todavía'}${queue.length?' · '+queue.length+' pendiente'+(queue.length>1?'s':''):''}</span></div>
+  <div class="row mt"><button data-act="hojasync">Sincronizar ahora</button><button data-act="hojalink">Copiar enlace para compañeros</button><button data-act="hojaoff">Desconectar</button></div>`
+  :`<p class="mut">Ahora los CN solo se guardan en este móvil. Conecta la hoja de Google para guardarlos en Drive y compartirlos.</p>${syncErr?`<div class="note">${esc(syncErr)}</div>`:''}
+  <div class="mt"><input id="hurl" type="search" placeholder="Enlace de la hoja (https://script.google.com/…/exec)" value="${esc(cfg.url)}" aria-label="Enlace de la hoja"></div>
+  <div class="row mt"><input id="hclave" type="search" placeholder="Clave" value="${esc(cfg.clave)}" style="flex:1;min-width:8em" aria-label="Clave"><button class="pri" data-act="hojasave">Conectar</button></div>`}</div>`;
 }
 if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
