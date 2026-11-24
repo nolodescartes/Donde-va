@@ -53,6 +53,8 @@ nav svg{width:22px;height:22px}
 .ghead{display:flex;align-items:center;gap:10px;margin-top:18px;padding:8px 12px;border-radius:10px;background:var(--k);color:var(--kf,#fff);font-weight:800;font-size:18px}
 .sub{margin:10px 0 0;font-weight:700;font-size:15px;display:flex;gap:8px;align-items:center}
 .note{border-left:4px solid var(--warn);padding:8px 12px;background:var(--soft);border-radius:0 8px 8px 0;font-size:15px}
+.cnbig{font-size:34px;font-weight:800;letter-spacing:.02em;margin:6px 0}
+.ok{border-left:4px solid var(--upe);padding:8px 12px;background:var(--soft);border-radius:0 8px 8px 0;margin-top:10px}
 .empty{padding:18px;text-align:center;color:var(--mut);border:1px dashed var(--line);border-radius:12px;margin-top:12px}
 @media (prefers-reduced-motion:reduce){.dot.on{animation:none}}
 </style>
@@ -61,20 +63,22 @@ nav svg{width:22px;height:22px}
 <header><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><h1>¿Dónde va?</h1></header>
 <main>
 <section id="v-scan">
+  <div id="scanslot"><div id="camwrap">
   <div class="cam" id="cam">
     <video id="video" playsinline muted></video>
     <div class="guide" id="guide" hidden></div>
     <div class="tools"><button id="torch" hidden aria-label="Linterna">💡</button><button id="stop" hidden aria-label="Parar cámara">✕</button></div>
-    <div class="off" id="off"><div>Apunta al nombre del medicamento dentro del recuadro</div><button class="pri" id="start">Activar cámara</button></div>
+    <div class="off" id="off"><div id="offmsg">Apunta al nombre del medicamento dentro del recuadro</div><button class="pri" id="start">Activar cámara</button></div>
   </div>
   <div class="state"><span class="dot" id="dot"></span><span id="msg">Cámara apagada</span></div>
+  </div></div>
   <div id="out"></div>
-  <div class="mt"><input id="q" type="search" placeholder="O escribe: nombre, principio activo o código SAP" autocomplete="off" aria-label="Buscar"></div>
+  <div class="mt"><input id="q" type="search" placeholder="O escribe: nombre, principio activo, CN o código SAP" autocomplete="off" aria-label="Buscar"></div>
   <div id="sres"></div>
 </section>
 <section id="v-rec" hidden></section>
 <section id="v-ubic" hidden></section>
-<section id="v-cn" hidden></section>
+<section id="v-cn" hidden><h2>Códigos CN</h2><p class="mut">Escanea el código cuadrado de la caja (junto a Lote/CAD) y elige a qué medicamento del listado corresponde.</p><div id="cnslot"></div><div id="cnout"></div><div id="cnlist"></div></section>
 </main>
 <nav>
   <button data-v="scan" aria-current="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8V5h3M17 5h3v3M20 16v3h-3M7 19H4v-3M7 12h10"/></svg>Escanear</button>
@@ -83,6 +87,7 @@ nav svg{width:22px;height:22px}
   <button data-v="cn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6v12M8 6v12M11 6v12M15 6v12M17 6v12M20 6v12"/></svg>Códigos CN</button>
 </nav>
 <script src="v/tesseract.min.js"></script>
+<script src="v/zxing-reader.js"></script>
 <script>
 {
 /* ---------- ubicaciones y grupos ---------- */
@@ -117,6 +122,7 @@ fetch('meds.json').then(r=>r.json()).then(rows=>{
 }).catch(()=>{$('#out').innerHTML='<div class="empty">No se ha podido cargar el listado.</div>'});
 
 function search(q){
+  const d=q.replace(/\D/g,'');if(/^\d{6,7}$/.test(q.trim())&&links.has(d.slice(0,6))&&BY[links.get(d.slice(0,6)).k])return[BY[links.get(d.slice(0,6)).k]];
   const qt=toks(q);if(!qt.length)return[];const res=[];
   for(const m of MEDS){let ok=true,ex=0;for(const t of qt){let hit=false;for(const v of m.t){if(v===t){hit=true;ex++;break}if(v.startsWith(t))hit=true}if(!hit){ok=false;break}}if(ok)res.push([ex,m])}
   return res.sort((a,b)=>b[0]-a[0]||(a[1].pa+a[1].den).length-(b[1].pa+b[1].den).length).slice(0,40).map(x=>x[1]);
@@ -133,23 +139,27 @@ function matchText(text){
 
 /* ---------- vistas comunes ---------- */
 function chip(m){const z=zone(m.u);return `<span class="chip" style="--k:${gcol(z.g)}">${esc(m.u)}</span>`}
-function itemList(ms,act='show'){return `<ul class="list">${ms.map(m=>`<li><button class="item" data-act="${act}" data-k="${esc(m.k)}">${chip(m)}<span><span class="t">${esc(m.pa)}</span><span class="s">${esc(m.den||m.note)}${m.sap?' · SAP '+esc(m.sap):''}</span></span></button></li>`).join('')}</ul>`}
 function cnFor(k){for(const [c,v] of links)if(v.k===k)return c;return ''}
+function codes(m){return `CN: ${esc(cnFor(m.k))}${m.sap?' · SAP: '+esc(m.sap):''}`}
+function itemList(ms,act='show'){return `<ul class="list">${ms.map(m=>`<li><button class="item" data-act="${act}" data-k="${esc(m.k)}">${chip(m)}<span><span class="t">${esc(m.pa)}</span><span class="s">${esc(m.den||m.note)}</span><span class="s">${codes(m)}</span></span></button></li>`).join('')}</ul>`}
 function labelHTML(m,extra=''){
-  const z=zone(m.u),cn=cnFor(m.k);
+  const z=zone(m.u),cn=cnFor(m.k),q=(rec.find(x=>x.k===m.k)||{}).q;
+  const assign=pendingCN&&pendingCN!==cn?`<button data-act="assign" data-k="${esc(m.k)}">Asignar CN ${esc(pendingCN)}</button>`:'';
   return `<article class="label" style="--k:${gcol(z.g)}"><div class="g">${esc(GROUPS[z.g])}</div>
   <div class="z">${chip(m)}<span>${z.num!=null?`<b>${z.num}</b> · `:''}${esc(z.name)}</span></div>
-  <div class="body"><div class="pa">${esc(m.pa)}</div><dl>${m.den?`<dt>Comercial</dt><dd>${esc(m.den)}</dd>`:''}${m.note?`<dt>Dónde</dt><dd>${esc(m.note)}</dd>`:''}${m.sap?`<dt>SAP</dt><dd>${esc(m.sap)}</dd>`:''}${cn?`<dt>CN</dt><dd>${esc(cn)}</dd>`:''}</dl>
-  <div class="row mt"><button class="pri" data-act="add" data-k="${esc(m.k)}">${(rec.find(x=>x.k===m.k)||{}).q?'+1 a recepción ('+rec.find(x=>x.k===m.k).q+')':'+1 a recepción'}</button><button data-act="next">Siguiente caja →</button>${extra}</div></div></article>`;
+  <div class="body"><div class="pa">${esc(m.pa)}</div><dl><dt>CN</dt><dd>${esc(cn)}</dd><dt>SAP</dt><dd>${esc(m.sap)}</dd>${m.den?`<dt>Comercial</dt><dd>${esc(m.den)}</dd>`:''}${m.note?`<dt>Dónde</dt><dd>${esc(m.note)}</dd>`:''}</dl>
+  <div class="row mt"><button class="pri" data-act="add" data-k="${esc(m.k)}">${q?'+1 a recepción ('+q+')':'+1 a recepción'}</button><button data-act="next">Siguiente caja →</button>${assign}${extra}</div></div></article>`;
 }
 
-/* ---------- cámara en directo ---------- */
-let skipK=null,skipUntil=0,stream=null,track=null,ocr=null,ocrBusy=false,locked=null,loopT=null,bcT=null,hist=[],lastCN='',lastText='',torchOn=false;
-const detector=('BarcodeDetector' in window)?(()=>{try{return new BarcodeDetector({formats:['ean_13','data_matrix']})}catch(e){return null}})():null;
-const video=$('#video'),canvas=document.createElement('canvas');
+/* ---------- cámara (modo escanear / modo CN) ---------- */
+let mode='scan',pendingCN='',skipK=null,skipUntil=0,stream=null,track=null,ocr=null,ocrBusy=false,bcBusy=false,locked=null,loopT=null,bcT=null,hist=[],lastText='',torchOn=false,zxReady=null;
+let detector=null;
+(async()=>{try{if('BarcodeDetector' in window){const f=await BarcodeDetector.getSupportedFormats();if(f.includes('data_matrix'))detector=new BarcodeDetector({formats:['data_matrix','ean_13']})}}catch(e){}})();
+function zx(){if(!zxReady&&window.ZXingWASM){ZXingWASM.prepareZXingModule({overrides:{locateFile:(p,pre)=>p.endsWith('.wasm')?new URL('v/'+p,location.href).href:pre+p}});zxReady=true}return zxReady}
+const video=$('#video'),canvas=document.createElement('canvas'),bcan=document.createElement('canvas');
 function state(t,on){$('#msg').textContent=t;$('#dot').classList.toggle('on',!!on)}
 async function startCam(){
-  if(!navigator.mediaDevices?.getUserMedia){state('Este navegador no permite usar la cámara. Abre la app en Chrome o Safari.');return}
+  if(!navigator.mediaDevices?.getUserMedia){state('Este navegador no permite usar la cámara. Abre la app en Chrome.');return}
   try{
     stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});
     video.srcObject=stream;await video.play();track=stream.getVideoTracks()[0];
@@ -161,17 +171,35 @@ async function startCam(){
       ocr=await Tesseract.createWorker('spa',1,{workerPath:base+'/worker.min.js',corePath:base,langPath:base,workerBlobURL:false,gzip:true});
       await ocr.setParameters({tessedit_pageseg_mode:'11'});
     }
-    if(!locked)state('Buscando… apunta al nombre del medicamento',true);
+    if(!locked)state(mode==='cn'?'Apunta al código cuadrado de la caja':'Buscando… apunta al nombre del medicamento',true);
   }catch(e){state(e&&e.name==='NotAllowedError'?'Has denegado la cámara. Permítela en los ajustes del navegador.':'No se pudo abrir la cámara.')}
 }
 function stopCam(){clearTimeout(loopT);clearInterval(bcT);if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;track=null;$('#off').hidden=false;$('#guide').hidden=true;$('#stop').hidden=true;$('#torch').hidden=true;state('Cámara apagada')}
-function resume(){locked=null;hist=[];lastCN='';clearInterval(bcT);if(detector)bcT=setInterval(scanBarcode,300);tick()}
+function resume(){locked=null;hist=[];clearInterval(bcT);bcT=setInterval(scanBarcode,350);tick()}
 function frame(){const vw=video.videoWidth,vh=video.videoHeight;if(!vw)return null;
   const sx=vw*.08,sy=vh*.18,sw=vw*.84,sh=vh*.64,sc=Math.min(1,1100/sw);canvas.width=sw*sc;canvas.height=sh*sc;
   const c=canvas.getContext('2d',{willReadFrequently:true});c.filter='grayscale(1) contrast(1.4)';c.drawImage(video,sx,sy,sw,sh,0,0,canvas.width,canvas.height);return canvas}
-function cnFromBarcode(v){v=String(v).replace(/\D/g,'');let m;if(v.length===13&&v.startsWith('847000'))return v.slice(6,12);if((m=v.match(/^01(\d{14})/))&&m[1].startsWith('0847000'))return m[1].slice(7,13);const i=v.indexOf('08470');if(i>=0&&v.length>=i+14)return v.slice(i+7,i+13);return ''}
-const cnFromText=t=>{const m=String(t).match(/C\.?\s*N\.?\s*[:.]?\s*(\d{6})/i);return m?m[1]:''};
-async function scanBarcode(){if(locked||!stream||!detector||video.readyState<2)return;try{const r=await detector.detect(video);for(const b of r){const cn=cnFromBarcode(b.rawValue);if(cn){lastCN=cn;if(links.has(cn)&&BY[links.get(cn).k]){lock(links.get(cn).k,`Reconocido por el código de barras (CN ${cn})`)}return}}}catch(e){}}
+function cnFromBarcode(v){v=String(v).replace(/\D/g,'');if(v.length===13&&v.startsWith('847000'))return v.slice(6,12);const i=v.indexOf('08470');if(i>=0&&v.length>=i+14)return v.slice(i+7,i+13);if(v.startsWith('8470')&&v.length>=13)return v.slice(6,12);return ''}
+const cnFromText=t=>{let m=String(t).match(/C\.?\s*N\.?\s*[:.]?\s*(\d{6})/i);if(m)return m[1];m=String(t).replace(/[ O]/g,x=>x==='O'?'0':'').match(/0?847000(\d{6})/);return m?m[1]:''};
+async function readCodes(){
+  if(detector){const r=await detector.detect(video);return r.map(b=>b.rawValue)}
+  if(!zx())return[];
+  const vw=video.videoWidth,vh=video.videoHeight,sc=Math.min(1,1280/Math.max(vw,vh));bcan.width=vw*sc;bcan.height=vh*sc;
+  const c=bcan.getContext('2d',{willReadFrequently:true});c.drawImage(video,0,0,bcan.width,bcan.height);
+  const r=await ZXingWASM.readBarcodes(c.getImageData(0,0,bcan.width,bcan.height),{formats:['DataMatrix','EAN-13'],tryHarder:true,maxNumberOfSymbols:2});
+  return r.filter(x=>x.isValid).map(x=>x.text);
+}
+async function scanBarcode(){
+  if(locked||!stream||bcBusy||video.readyState<2)return;bcBusy=true;
+  try{for(const raw of await readCodes()){const cn=cnFromBarcode(raw);if(cn){gotCN(cn,'el código de la caja');break}}}catch(e){}
+  bcBusy=false;
+}
+function gotCN(cn,how){
+  if(locked)return;
+  if(mode==='cn'){locked='cn';clearInterval(bcT);clearTimeout(loopT);pendingCN=cn;vib();cnPanel();return}
+  if(links.has(cn)&&BY[links.get(cn).k]){pendingCN='';lock(links.get(cn).k,`Reconocido por ${how} (CN ${cn})`);return}
+  if(pendingCN!==cn){pendingCN=cn;state(`CN ${cn} leído (aún no asignado). Apunta ahora al nombre…`,true)}
+}
 async function tick(){
   clearTimeout(loopT);if(!stream||locked)return;
   if(ocr&&!ocrBusy&&video.readyState>=2){
@@ -182,26 +210,29 @@ async function tick(){
   loopT=setTimeout(tick,ocr?150:600);
 }
 function handleText(text){
-  const cn=cnFromText(text);if(cn){lastCN=cn;if(links.has(cn)&&BY[links.get(cn).k]){lock(links.get(cn).k,`Reconocido por su código nacional (CN ${cn})`);return}}
-  const c=matchText(text);lastText=text;
-  if(!c.length){skipK=null;hist.push(null);if(hist.length>4)hist.shift();if(hist.every(x=>x===null)&&hist.length===4){$('#out').innerHTML='';state('Buscando… acerca la caja y que se lea el nombre',true)}return}
+  const cn=cnFromText(text);if(cn){gotCN(cn,'su código nacional');if(locked)return}
+  if(text.trim().length>8)lastText=text;
+  if(mode==='cn')return;
+  const c=matchText(text);
+  if(!c.length){skipK=null;hist.push(null);if(hist.length>4)hist.shift();if(hist.length===4&&hist.every(x=>x===null)){$('#out').innerHTML='';state(pendingCN?`CN ${pendingCN} leído. Apunta ahora al nombre…`:'Buscando… acerca la caja y que se lea el nombre',true)}return}
   if(skipK&&c[0].m.k===skipK&&Date.now()<skipUntil)return;
   if(skipK&&c[0].m.k!==skipK)skipK=null;
   const top=c[0],second=c[1];hist.push(top.m.k);if(hist.length>4)hist.shift();
-  const same=hist.slice(-2).every(k=>k===top.m.k)&&hist.length>=2;
+  const same=hist.length>=2&&hist.slice(-2).every(k=>k===top.m.k);
   const clear=!second||top.s>=second.s*1.25||(top.m.pa===second.m.pa&&top.m.u===second.m.u&&top.s>second.s*1.1);
-  if(same&&clear){lock(top.m.k,'Reconocido'+(lastCN?` · se guardará con el CN ${lastCN}`:''),true);return}
-  state('¿Es alguno de estos? Toca el correcto o sigue apuntando',true);
+  if(same&&clear){lock(top.m.k,'Reconocido por el nombre');return}
+  state((pendingCN?`CN ${pendingCN} leído · `:'')+'¿Es alguno de estos? Toca el correcto o sigue apuntando',true);
   $('#out').innerHTML=itemList(c.slice(0,3).map(x=>x.m),'pick');
 }
-function lock(k,why,learn){
-  locked=k;clearInterval(bcT);clearTimeout(loopT);
-  if(learn&&lastCN&&!links.has(lastCN))link(lastCN,k);
-  state(why,false);try{navigator.vibrate&&navigator.vibrate(80)}catch(e){}
-  const alt=lastText?`<button data-act="alts">No es este</button>`:'';
-  $('#out').innerHTML=labelHTML(BY[k],alt);
+function vib(){try{navigator.vibrate&&navigator.vibrate(80)}catch(e){}}
+function lock(k,why){
+  locked=k;clearInterval(bcT);clearTimeout(loopT);state(why,false);vib();
+  $('#out').innerHTML=labelHTML(BY[k],lastText?`<button data-act="alts">No es este</button>`:'');
 }
-function link(cn,k){const m=BY[k];links.set(cn,{k,n:nameOf(m)});ls.set('cnLinks',Object.fromEntries(links));renderCN()}
+function link(cn,k){
+  for(const [c,v] of [...links])if(v.k===k&&c!==cn)links.delete(c);
+  links.set(cn,{k,n:nameOf(BY[k])});ls.set('cnLinks',Object.fromEntries(links));renderCN();
+}
 $('#start').onclick=startCam;$('#stop').onclick=stopCam;
 $('#torch').onclick=async()=>{try{torchOn=!torchOn;await track.applyConstraints({advanced:[{torch:torchOn}]})}catch(e){}};
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&stream)stopCam()});
@@ -213,26 +244,35 @@ document.addEventListener('click',e=>{
   const b=e.target.closest('[data-act],[data-v]');if(!b)return;
   if(b.dataset.v){go(b.dataset.v);return}
   const a=b.dataset.act,k=b.dataset.k;
-  if(a==='show'){go('scan');locked=k;clearInterval(bcT);clearTimeout(loopT);state('Consulta manual',false);$('#out').innerHTML=labelHTML(BY[k]);$('#q').value='';$('#sres').innerHTML='';scrollTo({top:0})}
-  else if(a==='pick'){lock(k,'Elegido'+(lastCN?` · guardado con el CN ${lastCN}`:''),true)}
-  else if(a==='alts'){const c=matchText(lastText).map(x=>x.m).filter(m=>m.k!==locked);$('#out').innerHTML=c.length?'<p class="mut">Otras coincidencias:</p>'+itemList(c,'pick'):'<div class="empty">No hay otras coincidencias. Búscalo escribiendo abajo.</div>';if(lastCN&&links.get(lastCN)?.k===locked){links.delete(lastCN);ls.set('cnLinks',Object.fromEntries(links));renderCN()}locked=null}
-  else if(a==='add'){addRec(k);b.textContent='+1 a recepción ('+rec.find(x=>x.k===k).q+')'}
-  else if(a==='next'){skipK=locked;skipUntil=Date.now()+6000;$('#out').innerHTML='';stream?(resume(),state('Buscando la siguiente caja…',true)):state('Cámara apagada',false)}
+  if(a==='show'){locked=k;clearInterval(bcT);clearTimeout(loopT);state(pendingCN?`Consulta manual · CN ${pendingCN} pendiente de asignar`:'Consulta manual',false);$('#out').innerHTML=labelHTML(BY[k]);$('#q').value='';$('#sres').innerHTML='';scrollTo({top:0})}
+  else if(a==='pick'){lock(k,'Elegido')}
+  else if(a==='assign'){const cn=pendingCN;link(cn,k);pendingCN='';state(`CN ${cn} asignado`,false);$('#out').innerHTML=labelHTML(BY[k])}
+  else if(a==='alts'){const c=matchText(lastText).map(x=>x.m).filter(m=>m.k!==locked);$('#out').innerHTML=c.length?'<p class="mut">Otras coincidencias:</p>'+itemList(c,'pick'):'<div class="empty">No hay otras coincidencias. Búscalo escribiendo abajo.</div>';locked=null}
+  else if(a==='add'){const r=rec.find(x=>x.k===k);if(r)r.q++;else rec.push({k,q:1,d:false});saveRec();b.textContent='+1 a recepción ('+rec.find(x=>x.k===k).q+')'}
+  else if(a==='next'){skipK=locked;skipUntil=Date.now()+6000;pendingCN='';lastText='';$('#out').innerHTML='';stream?(resume(),state('Buscando la siguiente caja…',true)):state('Cámara apagada',false)}
   else if(a==='inc'||a==='dec'){const r=rec.find(x=>x.k===k);if(!r)return;r.q=Math.max(0,r.q+(a==='inc'?1:-1));if(!r.q)rec=rec.filter(x=>x!==r);saveRec()}
   else if(a==='clear'){if(b.dataset.sure){rec=[];saveRec()}else{b.dataset.sure=1;b.textContent='Toca otra vez para vaciar'}}
-  else if(a==='csv')exportCSV();
+  else if(a==='csv')exportCSV(table(),'recepcion');
   else if(a==='tsv')copy(table().map(r=>r.map(c=>String(c).replace(/\t|\n/g,' ')).join('\t')).join('\n'),b);
+  else if(a==='cnpick'){link(pendingCN,k);$('#cnout').innerHTML=`<div class="ok">✓ CN <b>${esc(pendingCN)}</b> asignado a <b>${esc(BY[k].pa)}</b> (SAP ${esc(BY[k].sap)})</div><div class="row mt"><button class="pri" data-act="cnnext">Escanear otra caja</button></div>`;pendingCN=''}
+  else if(a==='cnnext'){pendingCN='';lastText='';$('#cnout').innerHTML='';stream?(resume(),state('Apunta al código cuadrado de la caja',true)):startCam()}
+  else if(a==='cnmanual'){const v=($('#cnin').value||'').replace(/\D/g,'').slice(0,6);if(v.length!==6){$('#cnin').focus();return}pendingCN=v;locked='cn';clearInterval(bcT);clearTimeout(loopT);cnPanel()}
   else if(a==='unlink'){links.delete(b.dataset.cn);ls.set('cnLinks',Object.fromEntries(links));renderCN()}
+  else if(a==='cncsv')exportCSV([['CN','Código SAP','Principio activo','Denominación comercial','Ubicación','Grupo'],...[...links].filter(([c,v])=>BY[v.k]).map(([c,v])=>{const m=BY[v.k],z=zone(m.u);return[c,m.sap,m.pa,m.den,m.u,GROUPS[z.g]]})],'cn_sap');
   else if(a==='cpcn')copy(JSON.stringify(Object.fromEntries(links)),b);
   else if(a==='impcn'){try{const o=JSON.parse($('#imp').value);let n=0;for(const c in o)if(/^\d{6}$/.test(c)&&o[c]&&BY[o[c].k]){links.set(c,{k:o[c].k,n:String(o[c].n||'')});n++}ls.set('cnLinks',Object.fromEntries(links));renderCN();$('#impMsg').textContent=n+' códigos importados.'}catch(err){$('#impMsg').textContent='El texto pegado no tiene el formato correcto.'}}
   else if(a==='zone')openZone(b.dataset.z);
   else if(a==='zback')renderUbic();
 });
 document.addEventListener('change',e=>{if(e.target.dataset.done){const r=rec.find(x=>x.k===e.target.dataset.done);if(r){r.d=e.target.checked;saveRec()}}});
-function go(v){if(v!=='scan'&&stream)stopCam();['scan','rec','ubic','cn'].forEach(x=>$('#v-'+x).hidden=x!==v);document.querySelectorAll('nav button').forEach(n=>n.setAttribute('aria-current',n.dataset.v===v));scrollTo({top:0})}
+function go(v){
+  if(stream)stopCam();locked=null;pendingCN='';
+  ['scan','rec','ubic','cn'].forEach(x=>$('#v-'+x).hidden=x!==v);document.querySelectorAll('nav button').forEach(n=>n.setAttribute('aria-current',n.dataset.v===v));
+  if(v==='cn'||v==='scan'){mode=v;$(v==='cn'?'#cnslot':'#scanslot').appendChild($('#camwrap'));$('#offmsg').textContent=v==='cn'?'Apunta al código cuadrado de la caja (junto a Lote/CAD)':'Apunta al nombre del medicamento dentro del recuadro';$('#out').innerHTML='';$('#cnout').innerHTML='';}
+  scrollTo({top:0});
+}
 
 /* ---------- recepción ---------- */
-function addRec(k){const r=rec.find(x=>x.k===k);if(r)r.q++;else rec.push({k,q:1,d:false});saveRec()}
 function saveRec(){ls.set('recepcion',rec);renderRec()}
 function recRows(){return rec.map(r=>({...r,m:BY[r.k]})).filter(r=>r.m).sort((a,b)=>GORD.indexOf(zone(a.m.u).g)-GORD.indexOf(zone(b.m.u).g)||zone(a.m.u).ord-zone(b.m.u).ord||a.m.pa.localeCompare(b.m.pa))}
 function renderRec(){
@@ -242,12 +282,12 @@ function renderRec(){
   for(const r of rows){const z=zone(r.m.u);
     if(z.g!==g){g=z.g;u=null;h+=`<div class="ghead" style="--k:${gcol(g)}">${esc(GROUPS[g])}</div>`}
     if(z.code!==u){u=z.code;h+=`<div class="sub">${chip(r.m)}${esc(z.name)}</div>`}
-    h+=`<div class="rec${r.d?' done':''}"><div><span class="t" style="font-weight:700">${esc(r.m.pa)}</span><div class="mut">${esc(r.m.den||r.m.note)}${r.m.sap?' · SAP '+esc(r.m.sap):''}</div><label class="chk"><input type="checkbox" data-done="${esc(r.k)}"${r.d?' checked':''}>Colocado</label></div><div class="qty"><button data-act="dec" data-k="${esc(r.k)}" aria-label="Menos">−</button><span>${r.q}</span><button data-act="inc" data-k="${esc(r.k)}" aria-label="Más">+</button></div></div>`}
+    h+=`<div class="rec${r.d?' done':''}"><div><span class="t" style="font-weight:700">${esc(r.m.pa)}</span><div class="mut">${esc(r.m.den||r.m.note)}</div><div class="mut">${codes(r.m)}</div><label class="chk"><input type="checkbox" data-done="${esc(r.k)}"${r.d?' checked':''}>Colocado</label></div><div class="qty"><button data-act="dec" data-k="${esc(r.k)}" aria-label="Menos">−</button><span>${r.q}</span><button data-act="inc" data-k="${esc(r.k)}" aria-label="Más">+</button></div></div>`}
   $('#v-rec').innerHTML=h;
 }
-function table(){const d=new Date().toLocaleString('es-ES');return [['Grupo','Ubicación','Descripción ubicación','Principio activo','Denominación comercial','Código SAP','CN','Cantidad','Colocado','Fecha'],...recRows().map(r=>{const z=zone(r.m.u);return[GROUPS[z.g],r.m.u,z.name,r.m.pa,r.m.den||r.m.note,r.m.sap,cnFor(r.k),r.q,r.d?'Sí':'No',d]})]}
-function exportCSV(){const csv='﻿'+table().map(r=>r.map(c=>{c=String(c);return /[;"\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c}).join(';')).join('\r\n');
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='recepcion_'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
+function table(){const d=new Date().toLocaleString('es-ES');return [['CN','Código SAP','Grupo','Ubicación','Descripción ubicación','Principio activo','Denominación comercial','Cantidad','Colocado','Fecha'],...recRows().map(r=>{const z=zone(r.m.u);return[cnFor(r.k),r.m.sap,GROUPS[z.g],r.m.u,z.name,r.m.pa,r.m.den||r.m.note,r.q,r.d?'Sí':'No',d]})]}
+function exportCSV(rows,name){const csv='﻿'+rows.map(r=>r.map(c=>{c=String(c??'');return /[;"\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c}).join(';')).join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=name+'_'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
 async function copy(t,b){const o=b.textContent;try{await navigator.clipboard.writeText(t);b.textContent='✓ Copiado'}catch(e){b.textContent='No se pudo copiar'}setTimeout(()=>b.textContent=o,1800)}
 
 /* ---------- ubicaciones ---------- */
@@ -265,13 +305,24 @@ function openZone(c){const z=zone(c),ms=MEDS.filter(m=>m.u===c).sort((a,b)=>a.pa
   $('#zf').addEventListener('input',e=>{const qt=toks(e.target.value);$('#zlist').innerHTML=itemList(ms.filter(m=>qt.every(t=>m.t.some(v=>v.startsWith(t)))))});scrollTo({top:0})}
 
 /* ---------- códigos CN ---------- */
+function cnPanel(){
+  const cn=pendingCN,cur=links.get(cn),m=cur&&BY[cur.k];
+  state(`Código leído: CN ${cn}`,false);
+  const sug=lastText?matchText(lastText).map(x=>x.m).slice(0,4):[];
+  $('#cnout').innerHTML=`<div class="cnbig">CN ${esc(cn)}</div>
+  ${m?`<div class="ok">Ya está asignado a <b>${esc(m.pa)}</b> · SAP ${esc(m.sap)} · ${esc(m.u)}. Si no es correcto, elige otro abajo.</div>`:'<p>¿A qué medicamento del listado corresponde?</p>'}
+  ${sug.length?'<p class="mut">Sugerencias por lo que se lee en la caja:</p>'+itemList(sug,'cnpick'):''}
+  <div class="mt"><input id="cnq" type="search" placeholder="Busca el medicamento por nombre o SAP" aria-label="Buscar medicamento para el CN"></div><div id="cnres"></div>
+  <div class="row mt"><button data-act="cnnext">${m?'Escanear otra caja':'Cancelar'}</button></div>`;
+  $('#cnq').addEventListener('input',e=>{const r=search(e.target.value);$('#cnres').innerHTML=e.target.value.trim()?(r.length?itemList(r.slice(0,15),'cnpick'):'<div class="empty">Nada coincide.</div>'):''});
+}
 function renderCN(){
   const arr=[...links].map(([c,v])=>[c,BY[v.k]]).filter(x=>x[1]);
-  $('#v-cn').innerHTML=`<h2>Códigos nacionales aprendidos</h2>
-  <p>El listado no trae el CN, así que la app lo aprende: cuando reconoce una caja (o eliges el medicamento correcto) y ha leído su CN o su código de barras, lo guarda. La próxima vez esa caja se reconoce al instante.</p>
-  <p class="mut">${arr.length} códigos guardados en este móvil.</p>
-  ${arr.length?`<ul class="list">${arr.map(([c,m])=>`<li class="row" style="padding:8px 0;justify-content:space-between"><span>${chip(m)} <b>CN ${esc(c)}</b> · ${esc(m.pa)}</span><button data-act="unlink" data-cn="${esc(c)}">Quitar</button></li>`).join('')}</ul>`:''}
-  <h2>Pasar los códigos a otro móvil</h2><div class="row"><button data-act="cpcn">Copiar códigos</button></div>
+  $('#cnlist').innerHTML=`<h2>Escribir un CN a mano</h2><div class="row"><input id="cnin" type="search" inputmode="numeric" placeholder="6 dígitos, p. ej. 755348" style="flex:1;min-width:10em" aria-label="CN"><button data-act="cnmanual">Asignar</button></div>
+  <h2>CN asignados (${arr.length} de ${MEDS.length})</h2>
+  ${arr.length?`<ul class="list">${arr.map(([c,m])=>`<li class="row" style="padding:8px 0;justify-content:space-between"><span>${chip(m)} <b>CN: ${esc(c)}</b> · SAP: ${esc(m.sap)}<br><span class="mut">${esc(m.pa)}</span></span><button data-act="unlink" data-cn="${esc(c)}">Quitar</button></li>`).join('')}</ul>`:'<div class="empty">Todavía no hay ninguno.</div>'}
+  <div class="row mt"><button data-act="cncsv">Descargar lista CN–SAP (Excel)</button></div>
+  <h2>Pasar los CN a otro móvil</h2><div class="row"><button data-act="cpcn">Copiar códigos</button></div>
   <p class="mut mt">En el otro móvil, pega aquí el texto copiado:</p><textarea id="imp" aria-label="Pegar códigos"></textarea><div class="row mt"><button data-act="impcn">Importar</button><span id="impMsg" class="mut"></span></div>`;
 }
 if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
