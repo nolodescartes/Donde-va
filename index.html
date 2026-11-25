@@ -120,7 +120,7 @@ nav svg{width:24px;height:24px}
   </div>
   </div></div>
   <p class="hint" id="hint">Apunta al <b>nombre</b> o al <b>código cuadrado</b> de la caja</p>
-  <div class="searchbox"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0B5D3B" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="q" type="search" placeholder="Buscar por nombre, CN o SAP" autocomplete="off" aria-label="Buscar medicamento"></div>
+  <div class="searchbox"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0B5D3B" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="q" type="search" placeholder="Nombre, CN (aunque no esté) o SAP" autocomplete="off" aria-label="Buscar medicamento"></div>
   <div id="out"></div>
   <div id="sres"></div>
 </section>
@@ -313,7 +313,7 @@ $('#start').onclick=startCam;$('#stop').onclick=stopCam;
 $('#torch').onclick=async()=>{try{torchOn=!torchOn;await track.applyConstraints({advanced:[{torch:torchOn}]})}catch(e){}};
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&stream)stopCam()});
 
-let qT;$('#q').addEventListener('input',()=>{clearTimeout(qT);qT=setTimeout(()=>{const q=$('#q').value.trim();if(!q){$('#sres').innerHTML='';return}const r=search(q);$('#sres').innerHTML=r.length?itemList(r):'<div class="empty">Nada coincide. Prueba con menos palabras.</div>'},120)});
+let qT;$('#q').addEventListener('input',()=>{clearTimeout(qT);cnSearchSeq++;qT=setTimeout(()=>{const q=$('#q').value.trim();if(!q){$('#sres').innerHTML='';if(locked!=='cn')pendingCN='';return}const qd=q.replace(/[\s.]/g,'');let qcn=/^\d{6,7}$/.test(qd)?qd.slice(0,6):(/^\d{13,}$/.test(qd)?cnFromBarcode(qd):'');if(qcn&&!(links.has(qcn)&&BY[links.get(qcn).k])){searchCN(qcn);return}const r=search(q);$('#sres').innerHTML=r.length?itemList(r):'<div class="empty">Nada coincide. Prueba con menos palabras.</div>'},120)});
 
 /* ---------- acciones ---------- */
 document.addEventListener('click',e=>{
@@ -380,13 +380,13 @@ function drawGroup(){
 const cimaCache=new Map(Object.entries(ls.get('cima',{})));
 const cimaURL=cn=>'https://cima.aemps.es/cima/rest/presentacion/'+encodeURIComponent(cn);
 async function cima(cn){
-  if(cimaCache.has(cn)&&(cimaCache.get(cn).none||cimaCache.get(cn).pa))return cimaCache.get(cn);
+  if(cimaCache.has(cn)&&(cimaCache.get(cn).none||'atc' in cimaCache.get(cn)))return cimaCache.get(cn);
   const ac=new AbortController(),t=setTimeout(()=>ac.abort(),8000);
   try{const r=await fetch(cimaURL(cn),{signal:ac.signal});clearTimeout(t);
     if(r.status===404||r.status===204){const v={none:true};cimaCache.set(cn,v);saveCima();return v}
     if(!r.ok)return {err:true};
     const txt=await r.text();if(!txt.trim()){const v={none:true};cimaCache.set(cn,v);saveCima();return v}
-    const j=JSON.parse(txt);const v={nombre:String(j.nombre||''),comerc:!!j.comerc,lab:String(j.labtitular||''),nreg:String(j.nregistro||'').replace(/\D/g,''),pa:(Array.isArray(j.principiosActivos)?j.principiosActivos:[]).map(x=>({n:String(x.nombre||''),c:String(x.cantidad||''),u:String(x.unidad||'')}))};cimaCache.set(cn,v);saveCima();return v}
+    const j=JSON.parse(txt);const v={nombre:String(j.nombre||''),comerc:!!j.comerc,lab:String(j.labtitular||''),nreg:String(j.nregistro||'').replace(/\D/g,''),pa:(Array.isArray(j.principiosActivos)?j.principiosActivos:[]).map(x=>({n:String(x.nombre||''),c:String(x.cantidad||''),u:String(x.unidad||'')})),atc:(()=>{const a=(Array.isArray(j.atcs)?j.atcs:[]).find(x=>+x.nivel===4);return a?{c:String(a.codigo),n:String(a.nombre)}:null})()};cimaCache.set(cn,v);saveCima();return v}
   catch(e){clearTimeout(t);return {err:true}}
 }
 function saveCima(){ls.set('cima',Object.fromEntries([...cimaCache].slice(-1500)))}
@@ -481,6 +481,39 @@ function equivalents(r){
   });
 }
 let noAuto=new Set();
+
+/* ---------- buscar por CN en el buscador: qué es y su par más cercano ---------- */
+const atcCache=new Map();
+async function atcPAs(code){
+  if(atcCache.has(code))return atcCache.get(code);
+  const names=new Set();
+  try{for(let pag=1;pag<=2;pag++){const r=await fetch('https://cima.aemps.es/cima/rest/medicamentos?atc='+encodeURIComponent(code)+'&pagina='+pag);if(!r.ok)break;const j=await r.json();(j.resultados||[]).forEach(x=>{if(x.vtm&&x.vtm.nombre)names.add(String(x.vtm.nombre))});if(!j.totalFilas||pag*(j.tamanioPagina||200)>=j.totalFilas)break}}catch(e){}
+  const v=[...names];atcCache.set(code,v);return v;
+}
+const paKeys=n=>toks(n).filter(t=>t.length>=4&&!/\d/.test(t)&&!STOP.has(t)&&!LABS.has(t));
+let cnSearchSeq=0;
+async function searchCN(cn){
+  const seq=++cnSearchSeq,box=$('#sres');pendingCN=cn;
+  box.innerHTML=`<div class="cnbig" style="margin-top:10px">CN ${esc(cn)} <span class="mut" style="font-size:15px;font-weight:600">· no está asignado</span></div><div class="banner bnone">Consultando CIMA (AEMPS)…</div>`;
+  const r=await cima(cn);if(seq!==cnSearchSeq)return;
+  if(r.err){box.innerHTML=box.innerHTML.replace('Consultando CIMA (AEMPS)…','No se ha podido consultar CIMA ahora (sin conexión).');return}
+  if(r.none){box.querySelector('.banner').outerHTML=`<div class="banner bwarn">${WARN}<div><b>Este CN no aparece en CIMA.</b><br>Puede ser medicación extranjera, un producto sanitario o un número mal escrito.</div></div>`;return}
+  const link=`<a href="${r.nreg?'https://cima.aemps.es/cima/publico/detalle.html?nregistro='+r.nreg:'https://cima.aemps.es/cima/publico/home.html'}" target="_blank" rel="noopener">Ver ficha en CIMA</a>`;
+  const eq=equivalents(r),seen=new Set(eq.map(m=>m.k));
+  const keys=[...new Set((r.pa||[]).flatMap(p=>paKeys(p.n)))];
+  const same=keys.length?MEDS.filter(m=>!seen.has(m.k)&&keys.some(k=>m.t.includes(k))):[];same.forEach(m=>seen.add(m.k));
+  const sec=(t,ms)=>ms.length?`<h2 style="font-size:17px;margin:16px 0 4px">${t}</h2>`+itemList(ms.slice(0,12))+(ms.length>12?`<p class="mut">Y ${ms.length-12} más.</p>`:''):'';
+  const head=`<div class="cnbig" style="margin-top:10px">CN ${esc(cn)} <span class="mut" style="font-size:15px;font-weight:600">· no está asignado</span></div>
+  <div class="banner bok"><div><b>Es:</b> ${esc(r.nombre)}${r.lab?' · '+esc(r.lab):''}${r.comerc?'':' · <b>no comercializado</b>'}<br>${r.atc?`<span class="mut">Grupo: ${esc(r.atc.n)} (${esc(r.atc.c)})</span> · `:''}${link}</div></div>
+  <p class="mut" style="margin:10px 2px 0">Toca el que corresponda para ver dónde va; desde ahí puedes asignarle este CN.</p>`;
+  const render=fam=>{if(seq!==cnSearchSeq)return;box.innerHTML=head+sec('Equivalente: mismo principio activo y dosis',eq)+sec('Mismo principio activo, otra dosis o forma',same)+(fam===null?'<div class="banner bnone mt">Buscando medicamentos del mismo uso…</div>':sec(`Mismo uso: ${r.atc?esc(r.atc.n.toLowerCase()):'grupo terapéutico'}`,fam))+(!eq.length&&!same.length&&fam&&!fam.length?'<div class="empty">No hay nada parecido en el listado.</div>':'')};
+  render(r.atc?null:[]);
+  if(!r.atc)return;
+  const names=await atcPAs(r.atc.c);
+  const fk=[...new Set(names.flatMap(paKeys))].filter(k=>!keys.includes(k));
+  const fam=MEDS.filter(m=>!seen.has(m.k)&&fk.some(k=>m.t.includes(k))).sort((a,b)=>a.pa.localeCompare(b.pa));
+  render(fam);
+}
 
 /* ---------- lector externo (Zebra DataWedge / pistola USB o Bluetooth en modo teclado) ---------- */
 let wbuf='',wlast=0,wstart=0,wfield=null,wbefore='',lastRaw='';
