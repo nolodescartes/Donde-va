@@ -164,6 +164,7 @@ fetch('meds.json').then(r=>r.json()).then(rows=>{
   MEDS.forEach(m=>{BY[m.k]=m;m.t.forEach(t=>VOC[t]=(VOC[t]||0)+1)});
   for(const t in VOC)IDF[t]=Math.log(1+MEDS.length/VOC[t]);
   MEDS.forEach(m=>m.w=Math.sqrt(m.t.reduce((a,t)=>a+IDF[t],0)));
+  extras.forEach(addMed);
   renderUbic();renderCN();flush();
 }).catch(()=>{$('#out').innerHTML='<div class="empty">No se ha podido cargar el listado.</div>'});
 
@@ -187,7 +188,7 @@ function matchText(text){
 function chip(m){const z=zone(m.u);return `<span class="chip" style="--k:${gcol(z.g)}">${esc(m.u)}</span>`}
 function cnFor(k){for(const [c,v] of links)if(v.k===k)return c;return ''}
 function codes(m){return `CN: ${esc(cnFor(m.k))}${m.sap?' · SAP: '+esc(m.sap):''}`}
-function itemList(ms,act='show'){return `<ul class="list">${ms.map(m=>`<li><button class="item" data-act="${act}" data-k="${esc(m.k)}">${chip(m)}<span><span class="t">${esc(m.pa)}</span><span class="s">${esc(m.den||m.note)}</span><span class="s">${codes(m)}</span></span></button></li>`).join('')}</ul>`}
+function itemList(ms,act='show'){return `<ul class="list">${ms.map(m=>`<li><button class="item" data-act="${act}" data-k="${esc(m.k)}">${chip(m)}<span><span class="t">${esc(m.pa)}${m.extra?' <span style="font-size:11px;font-weight:700;color:#8A5A00;background:#FFF4C2;border-radius:6px;padding:1px 6px">AÑADIDO</span>':''}</span><span class="s">${esc(m.den||m.note)}</span><span class="s">${codes(m)}</span></span></button></li>`).join('')}</ul>`}
 const ICON={
 ag:'<path d="M3 3v18M21 3v18M3 9h18M3 15h18M3 21h18"/><rect x="6" y="5" width="4" height="4"/><rect x="12" y="6" width="3" height="3"/><rect x="7" y="11" width="5" height="4"/><rect x="15" y="17" width="4" height="4"/>',
 upe:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M12 11v5M9.5 13.5h5"/>',
@@ -339,7 +340,7 @@ $('#snap').onclick=async()=>{
 $('#torch').onclick=async()=>{try{torchOn=!torchOn;await track.applyConstraints({advanced:[{torch:torchOn}]})}catch(e){}};
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&stream)stopCam()});
 
-let qT;$('#q').addEventListener('input',()=>{clearTimeout(qT);cnSearchSeq++;qT=setTimeout(()=>{const q=$('#q').value.trim();if(!q){$('#sres').innerHTML='';if(locked!=='cn')pendingCN='';return}const qd=q.replace(/[\s.]/g,'');let qcn=/^\d{6,7}$/.test(qd)?qd.slice(0,6):(/^\d{13,}$/.test(qd)?cnFromBarcode(qd):'');if(qcn&&!(links.has(qcn)&&BY[links.get(qcn).k])){searchCN(qcn);return}const r=search(q);$('#sres').innerHTML=r.length?itemList(r):'<div class="empty">Nada coincide. Prueba con menos palabras.</div>'},120)});
+let qT;$('#q').addEventListener('input',()=>{clearTimeout(qT);cnSearchSeq++;qT=setTimeout(()=>{const q=$('#q').value.trim();if(!q){$('#sres').innerHTML='';if(locked!=='cn')pendingCN='';return}const qd=q.replace(/[\s.]/g,'');let qcn=/^\d{6,7}$/.test(qd)?qd.slice(0,6):(/^\d{13,}$/.test(qd)?cnFromBarcode(qd):'');if(qcn&&!(links.has(qcn)&&BY[links.get(qcn).k])){searchCN(qcn);return}const r=search(q);$('#sres').innerHTML=(r.length?itemList(r):'<div class="empty">Nada coincide. Prueba con menos palabras.</div>')+(r.length<4?addBtn('',q.toUpperCase()):'')},120)});
 
 /* ---------- acciones ---------- */
 document.addEventListener('click',e=>{
@@ -353,9 +354,17 @@ document.addEventListener('click',e=>{
   else if(a==='next'){const from=prevView;hideRes();if(from!=='scan'){locked=null;return}skipK=locked;skipUntil=Date.now()+6000;pendingCN='';lastText='';$('#out').innerHTML='';stream?(resume(),state('Buscando la siguiente caja…',true)):state('Cámara apagada',false)}
   else if(a==='cnpick'){const cn=pendingCN;link(cn,k);pendingCN='';$('#out').innerHTML='';locked=k;showRes(k,`✓ CN ${cn} asignado`)}
   else if(a==='undoeq'){const cn=b.dataset.cn;links.delete(cn);ls.set('cnLinks',Object.fromEntries(links));renderCN();queueRemove(cn);noAuto.add(cn);hideRes('scan');pendingCN=cn;locked='cn';cnPanel()}
+  else if(a==='addmed'){addForm(b.dataset.cn,b.dataset.guess)}
+  else if(a==='adg'){addG=b.dataset.g;document.querySelectorAll('#adgrp button').forEach(x=>{const on=x.dataset.g===addG;x.setAttribute('aria-pressed',on);x.style.background=on?'var(--k)':'';x.style.color=on?'var(--kf,#fff)':'';x.style.borderColor=on?'transparent':''});$('#adz').innerHTML=zoneOpts(addG)}
+  else if(a==='adsave'){const pa=$('#adpa').value.trim().toUpperCase(),den=$('#adden').value.trim().toUpperCase(),sap=$('#adsap').value.replace(/\D/g,''),u=$('#adz').value,cn=b.dataset.cn;
+    if(!pa){$('#adpa').focus();return}
+    const k=sap&&!BY[sap]?sap:'n'+(cn||Date.now().toString(36));
+    const m=addMed({k,u,pa,den,sap});if(!m)return;m.extra=true;saveExtras();
+    if(cn){link(cn,k)}else{queue.push({accion:'guardar',cn:'X'+k.slice(1),k,sap,pa,den,ubic:u,grupo:GROUPS[zone(u).g],cima:'',check:'Añadido a mano (no está en la guía)'});ls.set('colaHoja',queue);flush()}
+    pendingCN='';$('#out').innerHTML='';locked=k;renderUbic();showRes(k,'✓ Añadido a la lista')}
   else if(a==='cnnext'){pendingCN='';lastText='';$('#out').innerHTML='';locked=null;stream?(resume(),state('Buscando… apunta al nombre o al código',true)):state('Cámara apagada',false)}
   else if(a==='cnmanual'){const v=($('#cnin').value||'').replace(/\D/g,'').slice(0,6);if(v.length!==6){$('#cnin').focus();return}go('scan');pendingCN=v;locked='cn';cnPanel()}
-  else if(a==='unlink'){if(b.dataset.sure){links.delete(b.dataset.cn);ls.set('cnLinks',Object.fromEntries(links));renderCN();queueRemove(b.dataset.cn)}else{b.dataset.sure=1;b.textContent='¿Seguro?'}}
+  else if(a==='unlink'){if(b.dataset.sure){const lk=links.get(b.dataset.cn);links.delete(b.dataset.cn);ls.set('cnLinks',Object.fromEntries(links));if(lk&&BY[lk.k]&&BY[lk.k].extra)removeExtra(lk.k);renderCN();queueRemove(b.dataset.cn)}else{b.dataset.sure=1;b.textContent='¿Seguro?'}}
   else if(a==='hojasave'){cfg={url:$('#hurl').value.trim(),clave:$('#hclave').value.trim()};ls.set('hoja',cfg);if(!hojaOK()){syncErr='El enlace debe empezar por https://script.google.com/ y hace falta la clave.';renderCN();return}for(const [c,v] of links)if(!queue.some(o=>o.cn===c))queueSave(c,v.k);flush()}
   else if(a==='hojasync')flush();
   else if(a==='hojalink')copy(location.origin+location.pathname+'?hoja='+encodeURIComponent(cfg.url)+'&clave='+encodeURIComponent(cfg.clave),b);
@@ -455,6 +464,7 @@ const hojaOK=()=>/^https:\/\/script\.google(usercontent)?\.com\//.test(cfg.url)&
 async function queueSave(cn,k){
   const m=BY[k];if(!m)return;const z=zone(m.u);let ci='',ck='';
   try{const r=await cima(cn);if(r.nombre){ci=r.nombre;const v=compare(r,m);ck=v==='ok'?'Coincide':v==='dose'?'Dosis distinta':'No coincide'}else if(r.none)ck='No está en CIMA'}catch(e){}
+  if(m.extra)ck='Añadido a mano (no está en la guía)';
   queue=queue.filter(o=>o.cn!==cn);queue.push({accion:'guardar',cn,k,sap:m.sap,pa:m.pa,den:m.den||m.note,ubic:m.u,grupo:GROUPS[z.g],cima:ci,check:ck});
   ls.set('colaHoja',queue);flush();
 }
@@ -470,9 +480,9 @@ async function flush(){
     }
     const r=await fetch(cfg.url+(cfg.url.includes('?')?'&':'?')+'clave='+encodeURIComponent(cfg.clave));
     const j=await r.json();if(!j.ok)throw new Error(j.error==='clave'?'La clave no coincide con la de la hoja.':'No se ha podido leer la hoja.');
-    const nl=new Map();for(const f of j.filas||[]){const cn=String(f.cn).replace(/\D/g,'').padStart(6,'0').slice(-6);if(BY[f.k])nl.set(cn,{k:f.k,n:nameOf(BY[f.k])})}
+    const nl=new Map();let addedX=false;for(const f of j.filas||[]){const cn=String(f.cn).replace(/\D/g,'').padStart(6,'0').slice(-6);if(!BY[f.k]&&/^n/.test(f.k)&&f.pa&&f.u&&Z[f.u]){addMed({k:f.k,u:f.u,pa:f.pa,den:f.den,sap:f.sap});addedX=true}if(BY[f.k]&&/^\d{6}$/.test(String(f.cn).trim()))nl.set(cn,{k:f.k,n:nameOf(BY[f.k])})}
     for(const op of queue){if(op.accion==='guardar')nl.set(op.cn,{k:op.k,n:nameOf(BY[op.k])});else nl.delete(op.cn)}
-    links=nl;ls.set('cnLinks',Object.fromEntries(links));lastSync=Date.now();syncErr='';
+    links=nl;ls.set('cnLinks',Object.fromEntries(links));if(addedX)saveExtras();lastSync=Date.now();syncErr='';
   }catch(e){syncErr=e&&e.message&&!/fetch|network|json/i.test(e.message)?e.message:'Sin conexión con la hoja. Se guardará cuando vuelva la conexión.'}
   syncing=false;renderCN();
 }
@@ -531,7 +541,7 @@ async function searchCN(cn){
   const sec=(t,ms)=>ms.length?`<h2 style="font-size:17px;margin:16px 0 4px">${t}</h2>`+itemList(ms.slice(0,12))+(ms.length>12?`<p class="mut">Y ${ms.length-12} más.</p>`:''):'';
   const head=`<div class="cnbig" style="margin-top:10px">CN ${esc(cn)} <span class="mut" style="font-size:15px;font-weight:600">· no está asignado</span></div>
   <div class="banner bok"><div><b>Es:</b> ${esc(r.nombre)}${r.lab?' · '+esc(r.lab):''}${r.comerc?'':' · <b>no comercializado</b>'}<br>${r.atc?`<span class="mut">Grupo: ${esc(r.atc.n)} (${esc(r.atc.c)})</span> · `:''}${link}</div></div>
-  <p class="mut" style="margin:10px 2px 0">Toca el que corresponda para ver dónde va; desde ahí puedes asignarle este CN.</p>`;
+  <p class="mut" style="margin:10px 2px 0">Toca el que corresponda para ver dónde va; desde ahí puedes asignarle este CN.</p>${addBtn(cn,'')}`;
   const render=fam=>{if(seq!==cnSearchSeq)return;box.innerHTML=head+sec('Equivalente: mismo principio activo y dosis',eq)+sec('Mismo principio activo, otra dosis o forma',same)+(fam===null?'<div class="banner bnone mt">Buscando medicamentos del mismo uso…</div>':sec(`Mismo uso: ${r.atc?esc(r.atc.n.toLowerCase()):'grupo terapéutico'}`,fam))+(!eq.length&&!same.length&&fam&&!fam.length?'<div class="empty">No hay nada parecido en el listado.</div>':'')};
   render(r.atc?null:[]);
   if(!r.atc)return;
@@ -540,6 +550,38 @@ async function searchCN(cn){
   const fam=MEDS.filter(m=>!seen.has(m.k)&&fk.some(k=>m.t.includes(k))).sort((a,b)=>a.pa.localeCompare(b.pa));
   render(fam);
 }
+
+/* ---------- medicamentos añadidos a mano (no están en la guía) ---------- */
+let extras=ls.get('extras',[]);
+function addMed(e){
+  if(!e||!e.k||!e.u||!e.pa)return null;
+  if(BY[e.k]){const m=BY[e.k];Object.assign(m,{u:e.u,pa:e.pa,den:e.den||'',sap:e.sap||'',note:e.note||''});m.t=[...new Set(toks(m.pa+' '+m.den+' '+m.sap))];return m}
+  const m={k:e.k,u:e.u,pa:e.pa,den:e.den||'',sap:e.sap||'',note:e.note||'',extra:true};m.t=[...new Set(toks(m.pa+' '+m.den+' '+m.sap))];
+  m.t.forEach(t=>{VOC[t]=(VOC[t]||0)+1;if(!IDF[t])IDF[t]=Math.log(1+MEDS.length/VOC[t])});m.w=Math.sqrt(m.t.reduce((a,t)=>a+(IDF[t]||1),0));
+  MEDS.push(m);BY[m.k]=m;return m;
+}
+function saveExtras(){ls.set('extras',MEDS.filter(m=>m.extra).map(m=>({k:m.k,u:m.u,pa:m.pa,den:m.den,sap:m.sap,note:m.note})))}
+function removeExtra(k){const m=BY[k];if(!m||!m.extra)return;MEDS=MEDS.filter(x=>x!==m);delete BY[k];saveExtras()}
+let addG='ag';
+async function addForm(cn,guess){
+  locked='add';clearInterval(bcT);clearTimeout(loopT);$('#sres').innerHTML='';
+  let r={};if(cn){try{r=await cima(cn)}catch(e){}}
+  const pa=(r.pa&&r.pa.length)?r.pa.map(p=>`${p.n} ${String(p.c).replace(/,0+$/,'').replace(',','.')} ${p.u}`).join(' + ').toUpperCase():(guess||'');
+  const den=(r.nombre||'').toUpperCase();
+  const fc=r.nombre?formCat(r.nombre):'';
+  addG='ag';
+  $('#out').innerHTML=`<h2 style="margin-top:10px">Añadir a la lista</h2>
+  <p class="mut" style="margin-top:-4px">No está en la guía. ${cn?`Se guardará con el CN <b>${esc(cn)}</b>`:'Se guardará sin CN'} y quedará marcado para que farmacia lo revise.</p>
+  <label class="mut" for="adpa">Principio activo y dosis</label><input id="adpa" type="search" value="${esc(pa)}" placeholder="p. ej. NAPROXENO SODICO 550 MG">
+  <label class="mut" for="adden" style="display:block;margin-top:10px">Nombre comercial</label><input id="adden" type="search" value="${esc(den)}" placeholder="Como pone en la caja">
+  <label class="mut" for="adsap" style="display:block;margin-top:10px">Código SAP (si lo sabes)</label><input id="adsap" type="search" inputmode="numeric" placeholder="Opcional">
+  <div class="mut" style="margin-top:14px">¿Dónde va?</div>
+  <div class="row" id="adgrp" style="margin-top:6px">${GORD.filter(g=>g!=='warn').map(g=>`<button data-act="adg" data-g="${g}" aria-pressed="${g===addG}" style="--k:${gcol(g)};min-height:40px;border-radius:999px;font-size:14px${g===addG?';background:var(--k);color:var(--kf,#fff);border-color:transparent':''}">${esc(GROUPS[g])}</button>`).join('')}</div>
+  <select id="adz" aria-label="Subcategoría" style="font:inherit;font-size:16px;width:100%;min-height:52px;margin-top:10px;padding:0 12px;border-radius:16px;border:1.5px solid #CFE3D8;background:#fff">${zoneOpts(addG)}</select>
+  <div class="row mt"><button class="pri" data-act="adsave" data-cn="${esc(cn||'')}" style="flex:1;min-height:52px">Guardar y ver dónde va</button><button data-act="cnnext">Cancelar</button></div>`;
+}
+const zoneOpts=g=>ZONES.filter(z=>z[3]===g).map(z=>`<option value="${esc(z[0])}">${esc(z[0])} · ${esc(z[2])}</option>`).join('');
+function addBtn(cn,guess){return `<div class="row mt"><button data-act="addmed" data-cn="${esc(cn||'')}" data-guess="${esc(guess||'')}" style="border-style:dashed;color:var(--brand);font-weight:700">＋ No está en la guía: añadirlo</button></div>`}
 
 /* ---------- lector externo (Zebra DataWedge / pistola USB o Bluetooth en modo teclado) ---------- */
 let wbuf='',wlast=0,wstart=0,wfield=null,wbefore='',lastRaw='';
@@ -579,7 +621,7 @@ function cnPanel(){
   ${m?`<div class="ok">Ya está asignado a <b>${esc(m.pa)}</b> · SAP ${esc(m.sap)} · ${esc(m.u)}. Si no es correcto, elige otro abajo.</div>`:'<p>¿A qué medicamento del listado corresponde?</p>'}
   <div id="cnsug">${sug.length?'<p class="mut">Sugerencias por lo que se lee en la caja:</p>'+itemList(sug,'cnpick'):''}</div>
   <div class="mt"><input id="cnq" type="search" placeholder="Busca el medicamento por nombre o SAP" aria-label="Buscar medicamento para el CN"></div><div id="cnres"></div>
-  <div class="row mt"><button data-act="cnnext">Cancelar y seguir escaneando</button></div>`;
+  ${addBtn(cn,'')}<div class="row mt"><button data-act="cnnext">Cancelar y seguir escaneando</button></div>`;
   cima(cn).then(r=>{if(pendingCN!==cn||!r.nombre)return;const box=$('#cnsug');
     const eq=equivalents(r);
     if(eq.length&&!m&&!noAuto.has(cn)&&eq.every(e=>e.u===eq[0].u)){const fc=formCat(r.nombre),k=(eq.find(e=>formCat(e.pa+' '+e.den)===fc)||eq[0]).k;link(cn,k);pendingCN='';locked=k;$('#out').innerHTML='';vib();
