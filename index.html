@@ -24,6 +24,8 @@ header{position:sticky;top:0;z-index:6;background:var(--hbg);color:var(--hink);p
 body.res header{border-radius:0}
 header a{color:inherit;text-decoration:none}
 .logo{width:48px;height:48px;border-radius:14px;background:#fff;display:flex;align-items:center;justify-content:center}
+.gear{width:48px;height:48px;border-radius:14px;border:0;background:rgba(255,255,255,.14);color:inherit;padding:0;justify-self:end}
+body.res .gear{background:rgba(0,0,0,.1)}
 .htitle{justify-self:center;font-family:var(--disp);font-weight:800;font-size:28px;line-height:1;min-height:48px;display:flex;align-items:center;background:none;border:0;color:inherit;padding:0}
 main{max-width:760px;margin:0 auto;padding:16px 16px}
 button,.btn{font:inherit;font-size:16px;min-height:44px;border-radius:14px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);padding:8px 16px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}
@@ -51,7 +53,7 @@ h2{font-family:var(--disp);font-size:22px;margin:18px 0 8px}
 .item{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:none;border:0;border-radius:0;padding:12px 14px;justify-content:flex-start}
 .chip{flex:none;min-width:58px;text-align:center;font-weight:700;font-size:13px;padding:5px 7px;border-radius:8px;color:var(--kf,#fff);background:var(--k)}
 .item .t{display:block;font-weight:600;font-size:15px}.item .s{display:block;color:var(--mut);font-size:13px}
-nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:#fff;border-top:1px solid var(--line);padding:6px 0 calc(10px + env(safe-area-inset-bottom));z-index:5}
+nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));background:#fff;border-top:1px solid var(--line);padding:6px 0 calc(10px + env(safe-area-inset-bottom));z-index:5}
 nav button{border:0;border-radius:0;background:none;min-height:56px;font-size:12px;flex-direction:column;gap:3px;color:#5B7366}
 nav button[aria-current=true]{color:var(--pri);font-weight:700}
 nav svg{width:24px;height:24px}
@@ -104,7 +106,7 @@ nav svg{width:24px;height:24px}
 <header id="hdr">
   <a href="#" class="logo" data-v="scan" aria-label="Ir a Escanear"><svg width="38" height="38" viewBox="0 0 64 64" aria-hidden="true"><path d="M22 3h20v19h19v20H42v19H22V42H3V22h19z" fill="#00A859"/></svg></a>
   <button class="htitle" data-v="scan">¿Dónde va?</button>
-  <span aria-hidden="true"></span>
+  <button class="gear" data-v="cn" aria-label="Códigos CN y ajustes"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
 </header>
 <main>
 <section id="v-scan">
@@ -113,7 +115,7 @@ nav svg{width:24px;height:24px}
     <video id="video" playsinline muted></video>
     <div class="guide" id="guide" hidden><i></i><i></i><i></i><i></i></div>
     <div class="tools"><button id="torch" hidden aria-label="Linterna"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 2h6l-1 7h3l-7 13 1-9H7z"/></svg></button><button id="stop" hidden aria-label="Parar cámara"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
-    <div class="off" id="off"><div id="offmsg">Apunta al nombre del medicamento dentro del recuadro</div><button class="pri" id="start">Activar cámara</button></div>
+    <div class="off" id="off"><div id="offmsg">Apunta al nombre o al código cuadrado de la caja</div><button class="pri" id="start">Activar cámara</button></div>
     <div class="pill"><span class="dot" id="dot"></span><span id="msg">Cámara apagada</span></div>
   </div>
   </div></div>
@@ -124,12 +126,12 @@ nav svg{width:24px;height:24px}
 </section>
 <section id="v-res" hidden></section>
 <section id="v-ubic" hidden></section>
-<section id="v-cn" hidden><h2>Códigos CN</h2><p class="mut" style="margin-top:-4px">Escanea el código cuadrado de la caja (junto a Lote/CAD).</p><div id="cnslot"></div><div id="cnout"></div><div id="cnlist"></div></section>
+<section id="v-cn" hidden><h2 style="margin-top:4px">Códigos CN y ajustes</h2><div id="cnlist"></div></section>
 </main>
 <nav>
   <button data-v="scan" aria-current="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8V5h3M17 5h3v3M20 16v3h-3M7 19H4v-3M7 12h10"/></svg>Escanear</button>
   <button data-v="ubic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg>Ubicaciones</button>
-  <button data-v="cn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6v12M8 6v12M11 6v12M15 6v12M17 6v12M20 6v12"/></svg>Códigos CN</button>
+
 </nav>
 <script src="v/tesseract.min.js"></script>
 <script src="v/zxing-reader.js"></script>
@@ -271,9 +273,8 @@ async function scanBarcode(){
 }
 function gotCN(cn,how){
   if(locked)return;
-  if(mode==='cn'){locked='cn';clearInterval(bcT);clearTimeout(loopT);pendingCN=cn;vib();cnPanel();return}
   if(links.has(cn)&&BY[links.get(cn).k]){pendingCN='';lock(links.get(cn).k,`Reconocido por ${how} (CN ${cn})`);return}
-  if(pendingCN!==cn){pendingCN=cn;state(`CN ${cn} leído (aún no asignado). Apunta ahora al nombre…`,true)}
+  locked='cn';clearInterval(bcT);clearTimeout(loopT);pendingCN=cn;vib();cnPanel();
 }
 async function tick(){
   clearTimeout(loopT);if(!stream||locked)return;
@@ -324,9 +325,9 @@ document.addEventListener('click',e=>{
   else if(a==='assign'){const cn=pendingCN;link(cn,k);pendingCN='';showRes(k,`✓ CN ${cn} asignado`)}
   else if(a==='alts'){hideRes();const c=matchText(lastText).map(x=>x.m).filter(m=>m.k!==locked);$('#out').innerHTML=c.length?'<p class="mut">Otras coincidencias:</p>'+itemList(c,'pick'):'<div class="empty">No hay otras coincidencias. Búscalo escribiendo abajo.</div>';locked=null}
   else if(a==='next'){const from=prevView;hideRes();if(from!=='scan'){locked=null;return}skipK=locked;skipUntil=Date.now()+6000;pendingCN='';lastText='';$('#out').innerHTML='';stream?(resume(),state('Buscando la siguiente caja…',true)):state('Cámara apagada',false)}
-  else if(a==='cnpick'){link(pendingCN,k);$('#cnout').innerHTML=`<div class="ok">✓ CN <b>${esc(pendingCN)}</b> asignado a <b>${esc(BY[k].pa)}</b> (SAP ${esc(BY[k].sap)})</div>${cimaSlot(pendingCN,k)}<div class="row mt"><button class="pri" data-act="cnnext">Escanear otra caja</button></div>`;pendingCN=''}
-  else if(a==='cnnext'){pendingCN='';lastText='';$('#cnout').innerHTML='';stream?(resume(),state('Apunta al código cuadrado de la caja',true)):startCam()}
-  else if(a==='cnmanual'){const v=($('#cnin').value||'').replace(/\D/g,'').slice(0,6);if(v.length!==6){$('#cnin').focus();return}pendingCN=v;locked='cn';clearInterval(bcT);clearTimeout(loopT);cnPanel()}
+  else if(a==='cnpick'){const cn=pendingCN;link(cn,k);pendingCN='';$('#out').innerHTML='';locked=k;showRes(k,`✓ CN ${cn} asignado`)}
+  else if(a==='cnnext'){pendingCN='';lastText='';$('#out').innerHTML='';locked=null;stream?(resume(),state('Buscando… apunta al nombre o al código',true)):state('Cámara apagada',false)}
+  else if(a==='cnmanual'){const v=($('#cnin').value||'').replace(/\D/g,'').slice(0,6);if(v.length!==6){$('#cnin').focus();return}go('scan');pendingCN=v;locked='cn';cnPanel()}
   else if(a==='unlink'){if(b.dataset.sure){links.delete(b.dataset.cn);ls.set('cnLinks',Object.fromEntries(links));renderCN();queueRemove(b.dataset.cn)}else{b.dataset.sure=1;b.textContent='¿Seguro?'}}
   else if(a==='hojasave'){cfg={url:$('#hurl').value.trim(),clave:$('#hclave').value.trim()};ls.set('hoja',cfg);if(!hojaOK()){syncErr='El enlace debe empezar por https://script.google.com/ y hace falta la clave.';renderCN();return}for(const [c,v] of links)if(!queue.some(o=>o.cn===c))queueSave(c,v.k);flush()}
   else if(a==='hojasync')flush();
@@ -339,8 +340,8 @@ document.addEventListener('click',e=>{
 });
 function go(v){
   if(stream)stopCam();locked=null;pendingCN='';hideRes(v);
-  ['scan','ubic','cn'].forEach(x=>$('#v-'+x).hidden=x!==v);document.querySelectorAll('nav button').forEach(n=>n.setAttribute('aria-current',n.dataset.v===v));
-  if(v==='cn'||v==='scan'){mode=v;$(v==='cn'?'#cnslot':'#scanslot').appendChild($('#camwrap'));$('#offmsg').textContent=v==='cn'?'Apunta al código cuadrado de la caja (junto a Lote/CAD)':'Apunta al nombre del medicamento dentro del recuadro';$('#out').innerHTML='';$('#cnout').innerHTML='';}
+  ['scan','ubic','cn'].forEach(x=>$('#v-'+x).hidden=x!==v);document.querySelectorAll('nav button').forEach(n=>n.setAttribute('aria-current',n.dataset.v===v));$('.gear').setAttribute('aria-current',v==='cn');
+  if(v==='scan'){mode='scan';$('#out').innerHTML=''}
   if(v==='cn')flush();
   scrollTo({top:0});
 }
@@ -468,17 +469,14 @@ document.addEventListener('keydown',e=>{
 },true);
 function handleScan(raw){
   lastRaw=raw;const t=$('#wlast');if(t)t.textContent=raw.replace(/\x1d/g,'⟨GS⟩');
+  if(document.activeElement&&document.activeElement.id==='wtest'){vib();return}
   const digits=raw.replace(/\D/g,'');
   let cn=cnFromBarcode(raw);
   if(!cn&&/^\d{6,7}$/.test(digits))cn=digits.slice(0,6);
   if(stream){clearInterval(bcT);clearTimeout(loopT)}
-  if(mode==='cn'&&!$('#v-cn').hidden){
-    if(!cn){state('Código leído, pero no contiene un CN',false);return}
-    pendingCN=cn;locked='cn';vib();cnPanel();return;
-  }
   if(cn&&links.has(cn)&&BY[links.get(cn).k]){locked=links.get(cn).k;pendingCN='';vib();showRes(locked,`✓ Leído con el lector (CN ${cn})`);return}
   if(BY[digits]){locked=digits;vib();showRes(digits,'✓ Leído con el lector (código SAP)');return}
-  if(cn){go('cn');pendingCN=cn;locked='cn';vib();cnPanel();state(`CN ${cn} leído con el lector: aún no está asignado`,false);return}
+  if(cn){go('scan');pendingCN=cn;locked='cn';vib();cnPanel();state(`CN ${cn} leído con el lector: aún no está asignado`,false);return}
   go('scan');$('#q').value=raw.replace(/\x1d/g,' ');$('#q').dispatchEvent(new Event('input'));
 }
 
@@ -487,12 +485,12 @@ function cnPanel(){
   const cn=pendingCN,cur=links.get(cn),m=cur&&BY[cur.k];
   state(`Código leído: CN ${cn}`,false);
   const sug=lastText?matchText(lastText).map(x=>x.m).slice(0,4):[];
-  $('#cnout').innerHTML=`<div class="cnbig">CN ${esc(cn)}</div>
+  $('#sres').innerHTML='';$('#out').innerHTML=`<div class="cnbig" style="margin-top:10px">CN ${esc(cn)} <span class="mut" style="font-size:15px;font-weight:600">${m?'':'· nuevo'}</span></div>
   ${cimaSlot(cn,'')}
   ${m?`<div class="ok">Ya está asignado a <b>${esc(m.pa)}</b> · SAP ${esc(m.sap)} · ${esc(m.u)}. Si no es correcto, elige otro abajo.</div>`:'<p>¿A qué medicamento del listado corresponde?</p>'}
   <div id="cnsug">${sug.length?'<p class="mut">Sugerencias por lo que se lee en la caja:</p>'+itemList(sug,'cnpick'):''}</div>
   <div class="mt"><input id="cnq" type="search" placeholder="Busca el medicamento por nombre o SAP" aria-label="Buscar medicamento para el CN"></div><div id="cnres"></div>
-  <div class="row mt"><button data-act="cnnext">${m?'Escanear otra caja':'Cancelar'}</button></div>`;
+  <div class="row mt"><button data-act="cnnext">Cancelar y seguir escaneando</button></div>`;
   cima(cn).then(r=>{if(pendingCN!==cn||!r.nombre)return;const s2=cimaSugs(r.nombre);const box=$('#cnsug');if(box&&s2.length)box.innerHTML='<p class="mut">Según CIMA, puede ser:</p>'+itemList(s2,'cnpick')});
   $('#cnq').addEventListener('input',e=>{const r=search(e.target.value);$('#cnres').innerHTML=e.target.value.trim()?(r.length?itemList(r.slice(0,15),'cnpick'):'<div class="empty">Nada coincide.</div>'):''});
 }
