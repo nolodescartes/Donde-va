@@ -114,7 +114,7 @@ nav svg{width:24px;height:24px}
   <div class="cam" id="cam">
     <video id="video" playsinline muted></video>
     <div class="guide" id="guide" hidden><i></i><i></i><i></i><i></i></div>
-    <div class="tools"><button id="torch" hidden aria-label="Linterna"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 2h6l-1 7h3l-7 13 1-9H7z"/></svg></button><button id="stop" hidden aria-label="Parar cámara"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="tools"><button id="zoom" hidden aria-label="Zoom" style="font:700 14px Inter,sans-serif;width:44px">1×</button><button id="snap" hidden aria-label="Foto nítida"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button><button id="torch" hidden aria-label="Linterna"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 2h6l-1 7h3l-7 13 1-9H7z"/></svg></button><button id="stop" hidden aria-label="Parar cámara"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
     <div class="off" id="off"><div id="offmsg">Apunta al nombre o al código cuadrado de la caja</div><button class="pri" id="start">Activar cámara</button></div>
     <div class="pill"><span class="dot" id="dot"></span><span id="msg">Cámara apagada</span></div>
   </div>
@@ -238,7 +238,8 @@ async function startCam(){
   try{
     stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});
     video.srcObject=stream;await video.play();track=stream.getVideoTracks()[0];
-    try{const cap=track.getCapabilities?.();if(cap?.torch)$('#torch').hidden=false;if(cap?.focusMode?.includes('continuous'))track.applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}
+    zoomCap=null;zoomLv=1;$('#zoom').textContent='1×';try{const cap=track.getCapabilities?.();if(cap?.torch)$('#torch').hidden=false;if(cap?.zoom&&cap.zoom.max>=1.5){zoomCap=cap.zoom;$('#zoom').hidden=false}if(cap?.focusMode?.includes('continuous'))track.applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}
+    $('#snap').hidden=false;
     $('#off').hidden=true;$('#guide').hidden=false;$('#stop').hidden=false;
     resume();
     if(!ocr){state('Preparando el lector (solo la primera vez)…',true);
@@ -249,27 +250,39 @@ async function startCam(){
     if(!locked)state(mode==='cn'?'Apunta al código cuadrado de la caja':'Buscando… apunta al nombre del medicamento',true);
   }catch(e){state(e&&e.name==='NotAllowedError'?'Has denegado la cámara. Permítela en los ajustes del navegador.':'No se pudo abrir la cámara.')}
 }
-function stopCam(){clearTimeout(loopT);clearInterval(bcT);if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;track=null;$('#off').hidden=false;$('#guide').hidden=true;$('#stop').hidden=true;$('#torch').hidden=true;state('Cámara apagada')}
-function resume(){locked=null;hist=[];clearInterval(bcT);bcT=setInterval(scanBarcode,350);tick()}
-function frame(){const vw=video.videoWidth,vh=video.videoHeight;if(!vw)return null;
-  const sx=vw*.08,sy=vh*.18,sw=vw*.84,sh=vh*.64,sc=Math.min(1,1100/sw);canvas.width=sw*sc;canvas.height=sh*sc;
-  const c=canvas.getContext('2d',{willReadFrequently:true});c.filter='grayscale(1) contrast(1.4)';c.drawImage(video,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
-  if(c.filter!=='grayscale(1) contrast(1.4)'){const im=c.getImageData(0,0,canvas.width,canvas.height),d=im.data;for(let i=0;i<d.length;i+=4){let y=.299*d[i]+.587*d[i+1]+.114*d[i+2];y=(y-128)*1.4+128;y=y<0?0:y>255?255:y;d[i]=d[i+1]=d[i+2]=y}c.putImageData(im,0,0)}
+function stopCam(){clearTimeout(loopT);clearInterval(bcT);$('#zoom').hidden=true;$('#snap').hidden=true;if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;track=null;$('#off').hidden=false;$('#guide').hidden=true;$('#stop').hidden=true;$('#torch').hidden=true;state('Cámara apagada')}
+let zoomCap=null,zoomLv=1,bcPass=0,ocrPass=0,scanT0=0;
+function resume(){locked=null;hist=[];scanT0=Date.now();clearInterval(bcT);bcT=setInterval(scanBarcode,300);tick()}
+const TIPS=['Acerca el código cuadrado: que ocupe un tercio del recuadro','Inclina un poco la caja para quitar reflejos','Pulsa el botón de la cámara para una foto nítida','Si hay poca luz, enciende la linterna','Pon la caja plana y quieta un segundo'];
+function tip(){const t=Date.now()-scanT0;if(!locked&&stream&&t>8000)state('Consejo: '+TIPS[Math.floor(t/4000)%TIPS.length],true)}
+function prep(c,w,h){c.filter='grayscale(1) contrast(1.4)';return c.filter==='grayscale(1) contrast(1.4)'}
+function gray(c,w,h){const im=c.getImageData(0,0,w,h),d=im.data;for(let i=0;i<d.length;i+=4){let y=.299*d[i]+.587*d[i+1]+.114*d[i+2];y=(y-128)*1.4+128;y=y<0?0:y>255?255:y;d[i]=d[i+1]=d[i+2]=y}c.putImageData(im,0,0)}
+function frame(src){src=src||video;const vw=src.videoWidth||src.width,vh=src.videoHeight||src.height;if(!vw)return null;
+  const full=(ocrPass++%3===2);
+  const sx=full?0:vw*.08,sy=full?0:vh*.18,sw=full?vw:vw*.84,sh=full?vh:vh*.64,sc=Math.min(full?1:1.8,(full?1500:1300)/sw);canvas.width=Math.round(sw*sc);canvas.height=Math.round(sh*sc);
+  const c=canvas.getContext('2d',{willReadFrequently:true});const native=prep(c);c.imageSmoothingQuality='high';c.drawImage(src,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
+  if(!native)gray(c,canvas.width,canvas.height);
   return canvas}
 function cnFromBarcode(v){v=String(v).replace(/\D/g,'');if(v.length===13&&v.startsWith('847000'))return v.slice(6,12);const i=v.indexOf('08470');if(i>=0&&v.length>=i+14)return v.slice(i+7,i+13);if(v.startsWith('8470')&&v.length>=13)return v.slice(6,12);return ''}
 const cnFromText=t=>{let m=String(t).match(/C\.?\s*N\.?\s*[:.]?\s*(\d{6})/i);if(m)return m[1];m=String(t).replace(/[ O]/g,x=>x==='O'?'0':'').match(/0?847000(\d{6})/);return m?m[1]:''};
-async function readCodes(){
-  if(detector){const r=await detector.detect(video);return r.map(b=>b.rawValue)}
-  if(!zx())return[];
-  const vw=video.videoWidth,vh=video.videoHeight,sc=Math.min(1,1280/Math.max(vw,vh));bcan.width=vw*sc;bcan.height=vh*sc;
-  const c=bcan.getContext('2d',{willReadFrequently:true});c.drawImage(video,0,0,bcan.width,bcan.height);
-  const r=await ZXingWASM.readBarcodes(c.getImageData(0,0,bcan.width,bcan.height),{formats:['DataMatrix','EAN-13'],tryHarder:true,maxNumberOfSymbols:2});
-  return r.filter(x=>x.isValid).map(x=>x.text);
+async function readCodes(src){
+  src=src||video;const vw=src.videoWidth||src.width,vh=src.videoHeight||src.height;if(!vw)return[];
+  const pass=bcPass++%3,out=[];
+  // 0: imagen completa · 1: centro ampliado ×2 · 2: mitad superior ampliada (donde suele ir el código)
+  let sx=0,sy=0,sw=vw,sh=vh,max=1600;
+  if(pass===1){sx=vw*.25;sy=vh*.25;sw=vw*.5;sh=vh*.5;max=1400}
+  if(pass===2){sx=vw*.1;sy=vh*.1;sw=vw*.8;sh=vh*.5;max=1600}
+  const sc=Math.min(pass?2.2:1,max/Math.max(sw,sh));bcan.width=Math.round(sw*sc);bcan.height=Math.round(sh*sc);
+  const c=bcan.getContext('2d',{willReadFrequently:true});c.imageSmoothingQuality='high';c.drawImage(src,sx,sy,sw,sh,0,0,bcan.width,bcan.height);
+  if(detector){try{(await detector.detect(pass===0&&src===video?video:bcan)).forEach(b=>out.push(b.rawValue))}catch(e){}if(out.length||!zx())return out}
+  if(!zx())return out;
+  const r=await ZXingWASM.readBarcodes(c.getImageData(0,0,bcan.width,bcan.height),{formats:['DataMatrix','EAN-13'],tryHarder:true,tryRotate:true,tryInvert:true,tryDownscale:true,maxNumberOfSymbols:3});
+  r.filter(x=>x.isValid).forEach(x=>out.push(x.text));return out;
 }
 async function scanBarcode(){
   if(locked||!stream||bcBusy||video.readyState<2)return;bcBusy=true;
   try{for(const raw of await readCodes()){const cn=cnFromBarcode(raw);if(cn){gotCN(cn,'el código de la caja');break}}}catch(e){}
-  bcBusy=false;
+  bcBusy=false;tip();
 }
 function gotCN(cn,how){
   if(locked)return;
@@ -290,11 +303,11 @@ function handleText(text){
   if(text.trim().length>8)lastText=text;
   if(mode==='cn')return;
   const c=matchText(text);
-  if(!c.length){skipK=null;hist.push(null);if(hist.length>4)hist.shift();if(hist.length===4&&hist.every(x=>x===null)){$('#out').innerHTML='';state(pendingCN?`CN ${pendingCN} leído. Apunta ahora al nombre…`:'Buscando… acerca la caja y que se lea el nombre',true)}return}
+  if(!c.length){skipK=null;hist.push(null);if(hist.length>4)hist.shift();if(hist.length===4&&hist.every(x=>x===null)){$('#out').innerHTML='';if(Date.now()-scanT0<8000)state('Buscando… acerca la caja y que se lea el nombre',true)}return}
   if(skipK&&c[0].m.k===skipK&&Date.now()<skipUntil)return;
   if(skipK&&c[0].m.k!==skipK)skipK=null;
   const top=c[0],second=c[1];hist.push(top.m.k);if(hist.length>4)hist.shift();
-  const same=hist.length>=2&&hist.slice(-2).every(k=>k===top.m.k);
+  const same=hist.slice(-3).filter(k=>k===top.m.k).length>=2;
   const clear=!second||top.s>=second.s*1.25||(top.m.pa===second.m.pa&&top.m.u===second.m.u&&top.s>second.s*1.1);
   if(same&&clear){lock(top.m.k,'Reconocido por el nombre');return}
   state((pendingCN?`CN ${pendingCN} leído · `:'')+'¿Es alguno de estos? Toca el correcto o sigue apuntando',true);
@@ -310,6 +323,19 @@ function link(cn,k){
   links.set(cn,{k,n:nameOf(BY[k])});ls.set('cnLinks',Object.fromEntries(links));renderCN();queueSave(cn,k);
 }
 $('#start').onclick=startCam;$('#stop').onclick=stopCam;
+$('#zoom').onclick=async()=>{if(!zoomCap)return;const lv=[1,2,3].filter(v=>v<=zoomCap.max);zoomLv=lv[(lv.indexOf(zoomLv)+1)%lv.length]||1;try{await track.applyConstraints({advanced:[{zoom:Math.max(zoomCap.min||1,zoomLv)}]});$('#zoom').textContent=zoomLv+'×'}catch(e){}};
+$('#snap').onclick=async()=>{
+  if(!stream||locked)return;const b=$('#snap');b.disabled=true;clearInterval(bcT);clearTimeout(loopT);state('Analizando foto nítida…',true);
+  try{
+    let img=null;
+    try{if('ImageCapture' in window){const bl=await new ImageCapture(track).takePhoto();img=await createImageBitmap(bl)}}catch(e){}
+    if(!img){const c=document.createElement('canvas');c.width=video.videoWidth;c.height=video.videoHeight;c.getContext('2d').drawImage(video,0,0);img=c}
+    for(let k=0;k<3&&!locked;k++){for(const raw of await readCodes(img)){const cn=cnFromBarcode(raw);if(cn){gotCN(cn,'el código de la caja');break}}}
+    if(!locked&&ocr){for(let k=0;k<2&&!locked;k++){const f=frame(img);const {data}=await ocr.recognize(f);handleText(data.text)}}
+    if(!locked){scanT0=Date.now();state('Tampoco con la foto. Acércala más o escribe el nombre o el CN abajo',false)}
+  }catch(e){state('No se pudo hacer la foto',false)}
+  b.disabled=false;if(!locked&&stream){bcT=setInterval(scanBarcode,300);loopT=setTimeout(tick,600)}
+};
 $('#torch').onclick=async()=>{try{torchOn=!torchOn;await track.applyConstraints({advanced:[{torch:torchOn}]})}catch(e){}};
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&stream)stopCam()});
 
