@@ -64,7 +64,7 @@ nav svg{width:24px;height:24px}
 .ricon{width:84px;height:84px;border-radius:24px;background:var(--kf,#fff);color:var(--k);display:flex;align-items:center;justify-content:center}.ricon svg{width:50px;height:50px}
 .rgroup{font-family:var(--disp);font-weight:800;font-size:clamp(36px,11vw,46px);line-height:1}
 .rzone{display:flex;align-items:center;gap:10px;background:var(--kf,#fff);color:var(--k);border-radius:14px;padding:10px 14px;font-weight:600;font-size:15px}
-.rzone b{font-family:var(--disp);font-weight:800;font-size:22px;color:var(--kz,var(--k))}
+.rzone b{font-family:var(--disp);font-weight:800;font-size:22px}
 .rsheet{flex:1;background:var(--card);color:var(--ink);border-radius:28px 28px 0 0;padding:20px 20px 24px;display:flex;flex-direction:column;gap:14px}
 .rname{font-family:var(--disp);font-weight:800;font-size:22px;line-height:1.15}
 .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -326,6 +326,7 @@ document.addEventListener('click',e=>{
   else if(a==='alts'){hideRes();const c=matchText(lastText).map(x=>x.m).filter(m=>m.k!==locked);$('#out').innerHTML=c.length?'<p class="mut">Otras coincidencias:</p>'+itemList(c,'pick'):'<div class="empty">No hay otras coincidencias. Búscalo escribiendo abajo.</div>';locked=null}
   else if(a==='next'){const from=prevView;hideRes();if(from!=='scan'){locked=null;return}skipK=locked;skipUntil=Date.now()+6000;pendingCN='';lastText='';$('#out').innerHTML='';stream?(resume(),state('Buscando la siguiente caja…',true)):state('Cámara apagada',false)}
   else if(a==='cnpick'){const cn=pendingCN;link(cn,k);pendingCN='';$('#out').innerHTML='';locked=k;showRes(k,`✓ CN ${cn} asignado`)}
+  else if(a==='undoeq'){const cn=b.dataset.cn;links.delete(cn);ls.set('cnLinks',Object.fromEntries(links));renderCN();queueRemove(cn);noAuto.add(cn);hideRes('scan');pendingCN=cn;locked='cn';cnPanel()}
   else if(a==='cnnext'){pendingCN='';lastText='';$('#out').innerHTML='';locked=null;stream?(resume(),state('Buscando… apunta al nombre o al código',true)):state('Cámara apagada',false)}
   else if(a==='cnmanual'){const v=($('#cnin').value||'').replace(/\D/g,'').slice(0,6);if(v.length!==6){$('#cnin').focus();return}go('scan');pendingCN=v;locked='cn';cnPanel()}
   else if(a==='unlink'){if(b.dataset.sure){links.delete(b.dataset.cn);ls.set('cnLinks',Object.fromEntries(links));renderCN();queueRemove(b.dataset.cn)}else{b.dataset.sure=1;b.textContent='¿Seguro?'}}
@@ -379,13 +380,13 @@ function drawGroup(){
 const cimaCache=new Map(Object.entries(ls.get('cima',{})));
 const cimaURL=cn=>'https://cima.aemps.es/cima/rest/presentacion/'+encodeURIComponent(cn);
 async function cima(cn){
-  if(cimaCache.has(cn)&&(cimaCache.get(cn).none||cimaCache.get(cn).nreg))return cimaCache.get(cn);
+  if(cimaCache.has(cn)&&(cimaCache.get(cn).none||cimaCache.get(cn).pa))return cimaCache.get(cn);
   const ac=new AbortController(),t=setTimeout(()=>ac.abort(),8000);
   try{const r=await fetch(cimaURL(cn),{signal:ac.signal});clearTimeout(t);
     if(r.status===404||r.status===204){const v={none:true};cimaCache.set(cn,v);saveCima();return v}
     if(!r.ok)return {err:true};
     const txt=await r.text();if(!txt.trim()){const v={none:true};cimaCache.set(cn,v);saveCima();return v}
-    const j=JSON.parse(txt);const v={nombre:String(j.nombre||''),comerc:!!j.comerc,lab:String(j.labtitular||''),nreg:String(j.nregistro||'').replace(/\D/g,'')};cimaCache.set(cn,v);saveCima();return v}
+    const j=JSON.parse(txt);const v={nombre:String(j.nombre||''),comerc:!!j.comerc,lab:String(j.labtitular||''),nreg:String(j.nregistro||'').replace(/\D/g,''),pa:(Array.isArray(j.principiosActivos)?j.principiosActivos:[]).map(x=>({n:String(x.nombre||''),c:String(x.cantidad||''),u:String(x.unidad||'')}))};cimaCache.set(cn,v);saveCima();return v}
   catch(e){clearTimeout(t);return {err:true}}
 }
 function saveCima(){ls.set('cima',Object.fromEntries([...cimaCache].slice(-1500)))}
@@ -452,6 +453,35 @@ async function flush(){
 setInterval(()=>{if(!document.hidden)flush()},120000);
 window.addEventListener('online',flush);
 
+/* ---------- equivalentes de otro laboratorio (mismo principio activo y dosis) ---------- */
+const UNIT=u=>{u=norm(u).replace(/\s/g,'');if(/^(MG|MILIGRAMOS?)/.test(u))return'MG';if(/^(MCG|MICROGRAMOS?|UG)/.test(u))return'MCG';if(/^(G|GRAMOS?)$/.test(u)||/^G\//.test(u))return'G';if(/^(UI|U)/.test(u))return'UI';if(u.startsWith('%'))return'%';if(/^ML/.test(u))return'ML';return u.split('/')[0]};
+const numS=n=>String(+(+n).toFixed(4));
+function canonD(n,u){n=+n;if(u==='G'){n*=1000;u='MG'}else if(u==='MCG'){n/=1000;u='MG'}return numS(n)+u}
+function doseKeys(c,u){const n=parseFloat(String(c).replace(',','.'));return isFinite(n)?[canonD(n,UNIT(u))]:[]}
+const medDoses=m=>new Set([...norm(m.pa+' '+m.den).matchAll(/(\d+(?:\.\d+)?) (MG|MCG|G|UI|%|ML)/g)].map(x=>canonD(x[1],x[2])));
+function formCat(t){t=' '+norm(t)+' ';
+  if(/ (COMP|COMPRIMIDOS?|CAPS|CAPSULAS?|GRAG|GRAGEAS|TABL)\b/.test(t))return'oral';
+  if(/ (VIAL|VIALES|AMP|AMPOLLAS?|JER|JERINGAS?|INY|INYECTABLE|PLUMAS?|PERF|PERFUSION|BOLSA)\b/.test(t))return'iny';
+  if(/ (CREMA|POMADA|GEL|TOP|UNGUENTO|EMULSION CUTANEA)\b/.test(t))return'top';
+  if(/ (COLIRIO|OFT|OFTALMICA)\b/.test(t))return'oft';
+  if(/ (SUPOS|SUPOSITORIOS?|RECTAL)\b/.test(t))return'rect';
+  if(/ (INHAL|AEROSOL|NEBUL)\b/.test(t))return'inh';
+  if(/ (SOBRES?|SOB|POLVO)\b/.test(t))return'sob';
+  if(/ (JARABE|SUSP|SUSPENSION|GOTAS|SOL ORAL|SOLUCION ORAL)\b/.test(t))return'liq';
+  return'';}
+function equivalents(r){
+  if(!r||!r.pa||!r.pa.length)return[];
+  const pas=r.pa.map(p=>({keys:toks(p.n).filter(t=>t.length>=4&&!/\d/.test(t)&&!STOP.has(t)&&!LABS.has(t)),dose:doseKeys(p.c,p.u)})).filter(p=>p.keys.length);
+  if(!pas.length||pas.some(p=>!p.dose.length))return[];
+  const fc=formCat(r.nombre);
+  return MEDS.filter(m=>{
+    const md=medDoses(m);if(!md.size||md.size>pas.length)return false;
+    if(!pas.every(p=>p.keys.some(k=>m.t.includes(k))&&p.dose.some(d=>md.has(d))))return false;
+    const mf=formCat(m.pa+' '+m.den);return !fc||!mf||fc===mf;
+  });
+}
+let noAuto=new Set();
+
 /* ---------- lector externo (Zebra DataWedge / pistola USB o Bluetooth en modo teclado) ---------- */
 let wbuf='',wlast=0,wstart=0,wfield=null,wbefore='',lastRaw='';
 document.addEventListener('keydown',e=>{
@@ -491,7 +521,14 @@ function cnPanel(){
   <div id="cnsug">${sug.length?'<p class="mut">Sugerencias por lo que se lee en la caja:</p>'+itemList(sug,'cnpick'):''}</div>
   <div class="mt"><input id="cnq" type="search" placeholder="Busca el medicamento por nombre o SAP" aria-label="Buscar medicamento para el CN"></div><div id="cnres"></div>
   <div class="row mt"><button data-act="cnnext">Cancelar y seguir escaneando</button></div>`;
-  cima(cn).then(r=>{if(pendingCN!==cn||!r.nombre)return;const s2=cimaSugs(r.nombre);const box=$('#cnsug');if(box&&s2.length)box.innerHTML='<p class="mut">Según CIMA, puede ser:</p>'+itemList(s2,'cnpick')});
+  cima(cn).then(r=>{if(pendingCN!==cn||!r.nombre)return;const box=$('#cnsug');
+    const eq=equivalents(r);
+    if(eq.length&&!m&&!noAuto.has(cn)&&eq.every(e=>e.u===eq[0].u)){const fc=formCat(r.nombre),k=(eq.find(e=>formCat(e.pa+' '+e.den)===fc)||eq[0]).k;link(cn,k);pendingCN='';locked=k;$('#out').innerHTML='';vib();
+      showRes(k,`✓ Equivalente de otro laboratorio (CN ${cn})`,`<button data-act="undoeq" data-cn="${esc(cn)}">No es este</button>`);
+      const sh=$('#v-res .rsheet');if(sh)sh.insertAdjacentHTML('afterbegin',`<div class="banner bok"><div><b>Asignado automáticamente.</b> Mismo principio activo y dosis que el del listado; la caja es de ${esc(r.lab||'otro laboratorio')}.</div></div>`);return}
+    if(!box)return;
+    if(eq.length){box.innerHTML='<p class="mut">Mismo principio activo y dosis (otro laboratorio):</p>'+itemList(eq.slice(0,6),'cnpick');return}
+    const s2=cimaSugs(r.nombre);if(s2.length)box.innerHTML='<p class="mut">Según CIMA, puede ser:</p>'+itemList(s2,'cnpick')});
   $('#cnq').addEventListener('input',e=>{const r=search(e.target.value);$('#cnres').innerHTML=e.target.value.trim()?(r.length?itemList(r.slice(0,15),'cnpick'):'<div class="empty">Nada coincide.</div>'):''});
 }
 let cnOpen=new Set();
