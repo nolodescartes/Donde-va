@@ -135,7 +135,7 @@ nav svg{width:24px;height:24px}
 const GROUPS={ag:'Almacén General',upe:'UPE',cab:'Cabinas',hdd:'Hospital de Día',mor:'Mórficos',warn:'Revisar ubicación'};
 const GORD=['ag','upe','cab','hdd','mor','warn'];
 const ZONES=[
-['A.G.',2,'Almacén general','ag'],['A.F.',1,'Almacén fuera guía','ag'],['M.E.',3,'Medicación extranjera','ag'],['N.E.',4,'Nutrición enteral','ag'],['A.P.',5,'Pomadas','ag'],['A.S.',7,'Sueros','ag'],['A.U.',7,'Sueros · A.U.','ag'],['ANT',9,'Antisépticos','ag'],['COL',12,'Colirios y pomadas oftálmicas','ag'],['CON',13,'Contrastes','ag'],['CONG',14,'Congelador farmacia','ag'],['NEV',20,'Cámara frigorífica (med. general)','ag'],['NPT',21,'Nutrición parenteral','ag'],
+['A.G.',2,'Almacén general','ag'],['A.F.',1,'Almacén fuera guía','ag'],['M.E.',3,'Medicación extranjera','ag'],['N.E.',4,'Nutrición enteral','ag'],['A.P.',5,'Pomadas','ag'],['A.S.',7,'Sueros','ag'],['A.U.',7,'Sueros y leches infantiles','ag'],['ANT',9,'Antisépticos','ag'],['COL',12,'Colirios y pomadas oftálmicas','ag'],['CON',13,'Contrastes','ag'],['CONG',14,'Congelador farmacia','ag'],['NEV',20,'Cámara frigorífica (med. general)','ag'],['NPT',21,'Nutrición parenteral','ag'],
 ['UPE',8,'Armario medicación UPE · unidosis','upe'],['ADM',null,'Dispensación ambulatoria · edificio NEA 136','upe'],['NEA',null,'Nevera dispensación ambulatoria · NEA 136','upe'],['NEI',17,'Nevera intravítreas + Aranesp + Curosurf + Xembify','upe'],['NEL',19,'Nevera laboratorio galénica','upe'],
 ['CIT',10,'Citostáticos parenterales (interior cabinas)','cab'],['LAB',16,'Materias primas laboratorio','cab'],['NECI',18,'Nevera citostáticos','cab'],
 ['CITO',null,'Citostáticos orales · pasillo NEA 305','hdd'],['NECHDD',null,'Nevera citos consulta 305 · NEA','hdd'],
@@ -206,7 +206,7 @@ function resultHTML(m,why,extra=''){
   return `<div class="rtop"><div class="rwhy">${esc(why)}</div>
   <div class="ricon">${svgI(g,50,1.6)}</div>
   <div class="rgroup">${esc(GROUPS[g])}</div>
-  <div class="rzone"><b>${esc(m.u)}</b><span>${z.num!=null?'Zona '+z.num+' · ':''}${esc(z.name)}</span></div></div>
+  <div class="rzone"><b>${esc(m.u)}</b><span>${esc(z.name)}</span></div></div>
   <div class="rsheet">${frio}${cimaSlot(cn,m.k)}
   <div><div class="rname">${esc(m.pa)}</div>${m.den?`<div class="mut" style="font-size:15px">${esc(m.den)}</div>`:''}${m.note?`<div class="mut" style="font-size:15px"><b>Dónde:</b> ${esc(m.note)}</div>`:''}</div>
   <div class="tiles"><div class="tile"><small>CN</small><b style="color:${cn?'var(--brand)':'#8AA396'}">${cn?esc(cn):'—'}</b></div><div class="tile"><small>SAP</small><b>${esc(m.sap||'—')}</b></div></div>
@@ -361,7 +361,7 @@ function drawGroup(){
     const all=MEDS.filter(m=>m.u===c),ms=all.filter(m=>qt.every(t=>m.t.some(v=>v.startsWith(t)))).sort((a,b)=>a.pa.localeCompare(b.pa));
     if(filt&&!ms.length)continue;any=true;
     const z=zone(c),open=filt||zopen.has(c);
-    h+=`<button class="shead" data-act="ztog" data-z="${esc(c)}" aria-expanded="${open}"><span class="sc">${esc(c)}</span><span class="sn">${z.num!=null?'Zona '+z.num+' · ':''}${esc(z.name)}</span><span class="sq">${filt?ms.length+' de '+all.length:all.length}</span>${chev}</button>`;
+    h+=`<button class="shead" data-act="ztog" data-z="${esc(c)}" aria-expanded="${open}"><span class="sc">${esc(c)}</span><span class="sn">${esc(z.name)}</span><span class="sq">${filt?ms.length+' de '+all.length:all.length}</span>${chev}</button>`;
     if(open)h+=`<div class="sbody">${itemList(ms)}</div>`;
   }
   $('#zlist').innerHTML=any?h:'<div class="empty">Nada coincide.</div>';
