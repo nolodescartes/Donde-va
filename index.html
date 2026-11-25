@@ -124,7 +124,7 @@ nav svg{width:24px;height:24px}
 </section>
 <section id="v-res" hidden></section>
 <section id="v-ubic" hidden></section>
-<section id="v-cn" hidden><h2>Códigos CN</h2><p class="mut">Escanea el código cuadrado de la caja (junto a Lote/CAD) y elige a qué medicamento del listado corresponde.</p><div id="cnslot"></div><div id="cnout"></div><div id="cnlist"></div></section>
+<section id="v-cn" hidden><h2>Códigos CN</h2><p class="mut" style="margin-top:-4px">Escanea el código cuadrado de la caja (junto a Lote/CAD).</p><div id="cnslot"></div><div id="cnout"></div><div id="cnlist"></div></section>
 </main>
 <nav>
   <button data-v="scan" aria-current="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8V5h3M17 5h3v3M20 16v3h-3M7 19H4v-3M7 12h10"/></svg>Escanear</button>
@@ -333,6 +333,7 @@ document.addEventListener('click',e=>{
   else if(a==='hojalink')copy(location.origin+location.pathname+'?hoja='+encodeURIComponent(cfg.url)+'&clave='+encodeURIComponent(cfg.clave),b);
   else if(a==='hojaoff'){cfg={url:'',clave:''};ls.set('hoja',cfg);renderCN()}
   else if(a==='grp')openGroup(b.dataset.g);
+  else if(a==='cnsec'){const id=b.dataset.s;cnOpen.has(id)?cnOpen.delete(id):cnOpen.add(id);renderCN()}
   else if(a==='ztog'){const z=b.dataset.z;zopen.has(z)?zopen.delete(z):zopen.add(z);drawGroup()}
   else if(a==='zback')renderUbic();
 });
@@ -495,21 +496,28 @@ function cnPanel(){
   cima(cn).then(r=>{if(pendingCN!==cn||!r.nombre)return;const s2=cimaSugs(r.nombre);const box=$('#cnsug');if(box&&s2.length)box.innerHTML='<p class="mut">Según CIMA, puede ser:</p>'+itemList(s2,'cnpick')});
   $('#cnq').addEventListener('input',e=>{const r=search(e.target.value);$('#cnres').innerHTML=e.target.value.trim()?(r.length?itemList(r.slice(0,15),'cnpick'):'<div class="empty">Nada coincide.</div>'):''});
 }
+let cnOpen=new Set();
 function renderCN(){
   const arr=[...links].map(([c,v])=>[c,BY[v.k]]).filter(x=>x[1]);
-  $('#cnlist').innerHTML=`<h2>Escribir un CN a mano</h2><div class="row"><input id="cnin" type="search" inputmode="numeric" placeholder="6 dígitos, p. ej. 755348" style="flex:1;min-width:10em" aria-label="CN"><button data-act="cnmanual">Asignar</button></div>
-  <h2>CN asignados (${arr.length} de ${MEDS.length})</h2>
-  ${arr.length?`<ul class="list">${arr.map(([c,m])=>`<li class="row" style="padding:8px 0;justify-content:space-between"><span>${chip(m)} <b>CN: ${esc(c)}</b> · SAP: ${esc(m.sap)}<br><span class="mut">${esc(m.pa)}</span></span><button data-act="unlink" data-cn="${esc(c)}">Quitar</button></li>`).join('')}</ul>`:'<div class="empty">Todavía no hay ninguno.</div>'}
-  <h2>Lector Zebra o pistola</h2>
-  <p class="mut">Con el lector configurado como teclado (Zebra DataWedge: salida «Keystroke», con Intro al final), basta con escanear en cualquier pantalla de la app: no hace falta la cámara.</p>
+  const chev='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
+  const sec=(id,ico,title,badge,body)=>`<button class="shead" data-act="cnsec" data-s="${id}" aria-expanded="${cnOpen.has(id)}"><span class="sc">${ico}</span><span class="sn">${title}</span><span class="sq">${badge}</span>${chev}</button>${cnOpen.has(id)?`<div class="sbody" style="padding:4px 2px 8px">${body}</div>`:''}`;
+  const I=d=>`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const hojaBadge=!hojaOK()?'Sin conectar':syncErr?'⚠ Sin conexión':queue.length?queue.length+' pendiente'+(queue.length>1?'s':''):'✓ Conectada';
+  const asig=arr.length?`<ul class="list">${arr.map(([c,m])=>`<li class="row" style="padding:8px 12px;justify-content:space-between"><span>${chip(m)} <b>CN: ${esc(c)}</b> · SAP: ${esc(m.sap)}<br><span class="mut">${esc(m.pa)}</span></span><button data-act="unlink" data-cn="${esc(c)}">Quitar</button></li>`).join('')}</ul>`:'<div class="empty">Todavía no hay ninguno.</div>';
+  const zebra=`<p class="mut" style="margin-top:4px">Con el lector configurado como teclado (Zebra DataWedge: salida «Keystroke», con Intro al final), basta con escanear en cualquier pantalla de la app: no hace falta la cámara.</p>
   <div class="searchbox"><input id="wtest" type="search" placeholder="Toca aquí y escanea para probar" aria-label="Prueba del lector"></div>
-  <p class="mut mt">Último código recibido: <b id="wlast">${esc(lastRaw.replace(/\x1d/g,'⟨GS⟩'))||'ninguno'}</b></p>
-  <h2>Hoja compartida</h2>
-  ${hojaOK()?`<div class="${syncErr?'note':'ok'}">${syncErr?esc(syncErr):'✓ Conectada a la hoja de Google. Los CN se guardan allí y se comparten con quien use la misma hoja.'}<br><span class="mut">${lastSync?'Última sincronización: '+new Date(lastSync).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'Sin sincronizar todavía'}${queue.length?' · '+queue.length+' pendiente'+(queue.length>1?'s':''):''}</span></div>
+  <p class="mut mt">Último código recibido: <b id="wlast">${esc(lastRaw.replace(/\x1d/g,'⟨GS⟩'))||'ninguno'}</b></p>`;
+  const hoja=hojaOK()?`<div class="${syncErr?'note':'ok'}" style="margin-top:4px">${syncErr?esc(syncErr):'✓ Conectada a la hoja de Google. Los CN se guardan allí y se comparten con quien use la misma hoja.'}<br><span class="mut">${lastSync?'Última sincronización: '+new Date(lastSync).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'Sin sincronizar todavía'}${queue.length?' · '+queue.length+' pendiente'+(queue.length>1?'s':''):''}</span></div>
   <div class="row mt"><button data-act="hojasync">Sincronizar ahora</button><button data-act="hojalink">Copiar enlace para compañeros</button><button data-act="hojaoff">Desconectar</button></div>`
-  :`<p class="mut">Ahora los CN solo se guardan en este móvil. Conecta la hoja de Google para guardarlos en Drive y compartirlos.</p>${syncErr?`<div class="note">${esc(syncErr)}</div>`:''}
+  :`<p class="mut" style="margin-top:4px">Ahora los CN solo se guardan en este móvil. Conecta la hoja de Google para guardarlos en Drive y compartirlos.</p>${syncErr?`<div class="note">${esc(syncErr)}</div>`:''}
   <div class="mt"><input id="hurl" type="search" placeholder="Enlace de la hoja (https://script.google.com/…/exec)" value="${esc(cfg.url)}" aria-label="Enlace de la hoja"></div>
-  <div class="row mt"><input id="hclave" type="search" placeholder="Clave" value="${esc(cfg.clave)}" style="flex:1;min-width:8em" aria-label="Clave"><button class="pri" data-act="hojasave">Conectar</button></div>`}</div>`;
+  <div class="row mt"><input id="hclave" type="search" placeholder="Clave" value="${esc(cfg.clave)}" style="flex:1;min-width:8em" aria-label="Clave"><button class="pri" data-act="hojasave">Conectar</button></div>`;
+  $('#cnlist').innerHTML=`<h2>Escribir un CN a mano</h2><div class="row"><input id="cnin" type="search" inputmode="numeric" placeholder="6 dígitos, p. ej. 755348" style="flex:1;min-width:10em" aria-label="CN"><button class="pri" data-act="cnmanual">Asignar</button></div>
+  <div style="--k:var(--brand);margin-top:22px">
+  ${sec('asig',I('<path d="M4 6v12M8 6v12M11 6v12M15 6v12M17 6v12M20 6v12"/>'),'CN asignados',`${arr.length}`,asig)}
+  ${sec('zebra',I('<path d="M4 9h11l3 3v3H4zM8 15v4M15 9V6"/>'),'Lector Zebra o pistola',lastRaw?'✓ Probado':'',zebra)}
+  ${sec('hoja',I('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M4 15h16M10 3v18"/>'),'Hoja compartida',hojaBadge,hoja)}
+  </div>`;
 }
 if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
