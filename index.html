@@ -8,6 +8,10 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="¿Dónde va?">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@600;800&family=Inter:wght@400;600&display=swap" rel="stylesheet">
 <style>
@@ -247,7 +251,9 @@ function stopCam(){clearTimeout(loopT);clearInterval(bcT);if(stream)stream.getTr
 function resume(){locked=null;hist=[];clearInterval(bcT);bcT=setInterval(scanBarcode,350);tick()}
 function frame(){const vw=video.videoWidth,vh=video.videoHeight;if(!vw)return null;
   const sx=vw*.08,sy=vh*.18,sw=vw*.84,sh=vh*.64,sc=Math.min(1,1100/sw);canvas.width=sw*sc;canvas.height=sh*sc;
-  const c=canvas.getContext('2d',{willReadFrequently:true});c.filter='grayscale(1) contrast(1.4)';c.drawImage(video,sx,sy,sw,sh,0,0,canvas.width,canvas.height);return canvas}
+  const c=canvas.getContext('2d',{willReadFrequently:true});c.filter='grayscale(1) contrast(1.4)';c.drawImage(video,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
+  if(c.filter!=='grayscale(1) contrast(1.4)'){const im=c.getImageData(0,0,canvas.width,canvas.height),d=im.data;for(let i=0;i<d.length;i+=4){let y=.299*d[i]+.587*d[i+1]+.114*d[i+2];y=(y-128)*1.4+128;y=y<0?0:y>255?255:y;d[i]=d[i+1]=d[i+2]=y}c.putImageData(im,0,0)}
+  return canvas}
 function cnFromBarcode(v){v=String(v).replace(/\D/g,'');if(v.length===13&&v.startsWith('847000'))return v.slice(6,12);const i=v.indexOf('08470');if(i>=0&&v.length>=i+14)return v.slice(i+7,i+13);if(v.startsWith('8470')&&v.length>=13)return v.slice(6,12);return ''}
 const cnFromText=t=>{let m=String(t).match(/C\.?\s*N\.?\s*[:.]?\s*(\d{6})/i);if(m)return m[1];m=String(t).replace(/[ O]/g,x=>x==='O'?'0':'').match(/0?847000(\d{6})/);return m?m[1]:''};
 async function readCodes(){
@@ -444,6 +450,37 @@ async function flush(){
 setInterval(()=>{if(!document.hidden)flush()},120000);
 window.addEventListener('online',flush);
 
+/* ---------- lector externo (Zebra DataWedge / pistola USB o Bluetooth en modo teclado) ---------- */
+let wbuf='',wlast=0,wstart=0,wfield=null,wbefore='',lastRaw='';
+document.addEventListener('keydown',e=>{
+  const now=performance.now();
+  if(now-wlast>80){wbuf='';wstart=now;wfield=(e.target&&/^(INPUT|TEXTAREA)$/.test(e.target.tagName))?e.target:null;wbefore=wfield?wfield.value:''}
+  wlast=now;
+  if(e.key==='Enter'||e.key==='Tab'){
+    const fast=wbuf.length>=6&&(now-wstart)/Math.max(1,wbuf.length)<35;
+    if(fast){e.preventDefault();if(wfield&&wfield.id!=='wtest'){wfield.value=wbefore;wfield.dispatchEvent(new Event('input'))}const raw=wbuf;wbuf='';handleScan(raw)}
+    else wbuf='';
+    return;
+  }
+  if(e.key&&e.key.length===1)wbuf+=e.key;
+  else if(e.key==='Unidentified'||e.key==='GroupSeparator')wbuf+='\x1d';
+},true);
+function handleScan(raw){
+  lastRaw=raw;const t=$('#wlast');if(t)t.textContent=raw.replace(/\x1d/g,'⟨GS⟩');
+  const digits=raw.replace(/\D/g,'');
+  let cn=cnFromBarcode(raw);
+  if(!cn&&/^\d{6,7}$/.test(digits))cn=digits.slice(0,6);
+  if(stream){clearInterval(bcT);clearTimeout(loopT)}
+  if(mode==='cn'&&!$('#v-cn').hidden){
+    if(!cn){state('Código leído, pero no contiene un CN',false);return}
+    pendingCN=cn;locked='cn';vib();cnPanel();return;
+  }
+  if(cn&&links.has(cn)&&BY[links.get(cn).k]){locked=links.get(cn).k;pendingCN='';vib();showRes(locked,`✓ Leído con el lector (CN ${cn})`);return}
+  if(BY[digits]){locked=digits;vib();showRes(digits,'✓ Leído con el lector (código SAP)');return}
+  if(cn){go('cn');pendingCN=cn;locked='cn';vib();cnPanel();state(`CN ${cn} leído con el lector: aún no está asignado`,false);return}
+  go('scan');$('#q').value=raw.replace(/\x1d/g,' ');$('#q').dispatchEvent(new Event('input'));
+}
+
 /* ---------- códigos CN ---------- */
 function cnPanel(){
   const cn=pendingCN,cur=links.get(cn),m=cur&&BY[cur.k];
@@ -463,6 +500,10 @@ function renderCN(){
   $('#cnlist').innerHTML=`<h2>Escribir un CN a mano</h2><div class="row"><input id="cnin" type="search" inputmode="numeric" placeholder="6 dígitos, p. ej. 755348" style="flex:1;min-width:10em" aria-label="CN"><button data-act="cnmanual">Asignar</button></div>
   <h2>CN asignados (${arr.length} de ${MEDS.length})</h2>
   ${arr.length?`<ul class="list">${arr.map(([c,m])=>`<li class="row" style="padding:8px 0;justify-content:space-between"><span>${chip(m)} <b>CN: ${esc(c)}</b> · SAP: ${esc(m.sap)}<br><span class="mut">${esc(m.pa)}</span></span><button data-act="unlink" data-cn="${esc(c)}">Quitar</button></li>`).join('')}</ul>`:'<div class="empty">Todavía no hay ninguno.</div>'}
+  <h2>Lector Zebra o pistola</h2>
+  <p class="mut">Con el lector configurado como teclado (Zebra DataWedge: salida «Keystroke», con Intro al final), basta con escanear en cualquier pantalla de la app: no hace falta la cámara.</p>
+  <div class="searchbox"><input id="wtest" type="search" placeholder="Toca aquí y escanea para probar" aria-label="Prueba del lector"></div>
+  <p class="mut mt">Último código recibido: <b id="wlast">${esc(lastRaw.replace(/\x1d/g,'⟨GS⟩'))||'ninguno'}</b></p>
   <h2>Hoja compartida</h2>
   ${hojaOK()?`<div class="${syncErr?'note':'ok'}">${syncErr?esc(syncErr):'✓ Conectada a la hoja de Google. Los CN se guardan allí y se comparten con quien use la misma hoja.'}<br><span class="mut">${lastSync?'Última sincronización: '+new Date(lastSync).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'Sin sincronizar todavía'}${queue.length?' · '+queue.length+' pendiente'+(queue.length>1?'s':''):''}</span></div>
   <div class="row mt"><button data-act="hojasync">Sincronizar ahora</button><button data-act="hojalink">Copiar enlace para compañeros</button><button data-act="hojaoff">Desconectar</button></div>`
