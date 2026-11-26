@@ -31,7 +31,7 @@ main{max-width:760px;margin:0 auto;padding:16px 16px}
 button,.btn{font:inherit;font-size:16px;min-height:44px;border-radius:14px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);padding:8px 16px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}
 button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid #FF6A3D;outline-offset:2px}
 .pri{background:var(--pri);border:0;color:#fff;font-family:var(--disp);font-weight:800}
-input[type=search],textarea{font:inherit;font-size:16px;width:100%;min-height:52px;padding:10px 16px;border-radius:16px;border:1.5px solid #CFE3D8;background:var(--card);color:var(--ink)}
+input[type=search],input[type=time],textarea{font:inherit;font-size:16px;width:100%;min-height:52px;padding:10px 16px;border-radius:16px;border:1.5px solid #CFE3D8;background:var(--card);color:var(--ink)}
 textarea{min-height:90px}
 .searchbox{position:relative}.searchbox svg{position:absolute;left:16px;top:50%;transform:translateY(-50%);pointer-events:none}.searchbox input{padding-left:46px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.mt{margin-top:12px}.mut{color:var(--mut);font-size:14px}
@@ -102,6 +102,10 @@ nav svg{width:24px;height:24px}
 .rxl{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:8px}
 .rxin{font:inherit;font-size:15px;min-height:42px;padding:6px 10px;border-radius:10px;border:1.5px solid #CFE3D8;background:#fff;color:var(--ink);width:100%}
 #cadf button[aria-pressed=true]{background:var(--brand);color:#fff;border-color:transparent}
+.bigb{width:100%;min-height:72px;font-size:21px;border-radius:20px;display:flex;align-items:center;justify-content:center;gap:12px;margin-top:4px}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.pbtn{min-height:76px;font-size:19px;font-weight:700;border-radius:18px;background:var(--card);border:2px solid var(--line);color:var(--brand);font-family:var(--disp)}
+.arrc{display:flex;flex-direction:column;gap:10px;background:var(--soft);border:2px solid var(--pri);border-radius:18px;padding:14px;margin-top:12px;font-size:16px}.arrc.done{border-color:var(--line);background:var(--card)}.pbtn[aria-pressed=true]{background:var(--pri);color:#fff;border-color:var(--pri)}
+.arrc .pri{min-height:56px;font-size:18px;border-radius:16px}
 .empty{padding:18px;text-align:center;color:var(--mut);border:1px dashed #BFD6C8;border-radius:16px;margin-top:12px}
 @media (prefers-reduced-motion:reduce){.dot.on{animation:none}header{transition:none}}
 </style>
@@ -377,7 +381,18 @@ document.addEventListener('click',e=>{
     if(cn){link(cn,k)}else{queue.push({accion:'guardar',cn:'X'+k.slice(1),k,sap,pa,den,ubic:u,grupo:GROUPS[zone(u).g],cima:'',check:'Añadido a mano (no está en la guía)'});ls.set('colaHoja',queue);flush()}
     pendingCN='';$('#out').innerHTML='';locked=k;renderUbic();showRes(k,'✓ Añadido a la lista')}
   else if(a==='melist'){$('#cnres').innerHTML=itemList(MEDS.filter(m=>m.u==='M.E.').sort((a,b)=>a.pa.localeCompare(b.pa)),'cnpick');b.remove()}
-  else if(a==='rxstart')rxStart();
+  else if(a==='rxstart')rxStart(b.dataset.arr||'');
+  else if(a==='arr'){entStep='pick';renderEnt()}
+  else if(a==='arrp')arrLog(b.dataset.p);
+  else if(a==='arrother'){const v=($('#arrnew').value||'').trim();if(!v){$('#arrnew').focus();return}const ps=ls.get('provs',[]);if(!PROVS.concat(ps).some(x=>x.toLowerCase()===v.toLowerCase())){ps.push(v);ls.set('provs',ps)}arrLog(v)}
+  else if(a==='arrcancel'){entStep=null;renderEnt()}
+  else if(a==='arrundo')arrUndo(b.dataset.id);
+  else if(a==='arred'){entStep='edit:'+b.dataset.id;entFlash='';renderEnt();scrollTo(0,0)}
+  else if(a==='arrep'){const id=entStep.slice(5);entEditP=b.dataset.p;document.querySelectorAll('.pgrid .pbtn').forEach(x=>x.setAttribute('aria-pressed',x.dataset.p===entEditP))}
+  else if(a==='arrsave'){const id=entStep.slice(5),h=($('#arrh').value||'').slice(0,5),o=($('#arrnew2')||{}).value;let p=entEditP;if(o&&o.trim()){p=o.trim();const ps=ls.get('provs',[]);if(!PROVS.concat(ps).some(x=>x.toLowerCase()===p.toLowerCase())){ps.push(p);ls.set('provs',ps)}}arrEdit(id,{prov:p,hora:h})}
+  else if(a==='arrdel'){if(b.dataset.sure)arrEdit(entStep.slice(5),{borrar:1});else{b.dataset.sure=1;b.textContent='Toca otra vez para borrarlo'}}
+  else if(a==='arrlater'){const l=llegadas.find(x=>x.id===b.dataset.id);if(l){l.later=1;ls.set('llegadas',llegadas)}entFlash='';renderEnt()}
+  else if(a==='entsec'){const id=b.dataset.s;entOpen.has(id)?entOpen.delete(id):entOpen.add(id);renderEnt()}
   else if(a==='rxend'){if(b.dataset.sure)rxEnd();else{b.dataset.sure=1;b.textContent='Toca otra vez para guardar'}}
   else if(a==='rxcancel'){if(b.dataset.sure){if(stream)stopCam();rx=null;saveRx();renderEnt()}else{b.dataset.sure=1;b.textContent='¿Descartar todo?'}}
   else if(a==='rxinc'||a==='rxdec'){const l=rx&&rx.lines.find(x=>x.id===b.dataset.id);if(!l)return;l.qty=Math.max(0,l.qty+(a==='rxinc'?1:-1));if(!l.qty)rx.lines=rx.lines.filter(x=>x!==l);saveRx();renderRxLines()}
@@ -688,7 +703,8 @@ const saveRx=()=>ls.set('rx',rx);
 const monthsLeft=cad=>{if(!cad)return null;const d=new Date(cad+'T00:00:00');return (d-new Date())/(30.44*864e5)};
 function cadBadge(cad){const m=monthsLeft(cad);if(m===null)return'';if(m<0)return'<span class="cb" style="background:#C62828;color:#fff">CADUCADO</span>';if(m<3)return'<span class="cb" style="background:#E0A800;color:#1B1400">caduca en &lt;3 meses</span>';if(m<6)return'<span class="cb" style="background:#FFF4C2;color:#4A3300">&lt;6 meses</span>';return''}
 const fmtCad=c=>c?c.slice(5,7)+'/'+c.slice(0,4):'';
-function rxStart(){rx={id:Date.now().toString(36),start:new Date().toISOString(),alb:($('#rxalb')||{}).value||'',who:($('#rxwho')||{}).value||ls.get('rxWho',''),lines:[],serials:[]};ls.set('rxWho',rx.who);saveRx();renderEnt()}
+function rxStart(arr){const L=llegadas.find(x=>x.id===arr);const who=(($('#rxwho')||{}).value||ls.get('rxWho','')).trim();ls.set('rxWho',who);
+  rx={id:Date.now().toString(36),start:new Date().toISOString(),alb:'',who,prov:L?L.prov:'',arr:L?L.id:'',lines:[],serials:[]};entFlash='';saveRx();renderEnt()}
 function rxFind(key,k,lote,cad){return rx.lines.find(l=>(k?l.k===k:l.code===key)&&l.lote===lote&&l.cad===cad)}
 async function rxScan(key,g,how){
   if(!rx)return;g=g||{};const now=Date.now();
@@ -718,48 +734,129 @@ function renderEnt(){
   const v=$('#v-ent');if(!v)return;
   if(rx){
     v.innerHTML=`<div class="row" style="justify-content:space-between"><h2 style="margin:4px 0">Recepción en curso</h2><span class="mut" id="rxcount"></span></div>
-    <p class="mut" style="margin:0 0 8px">${new Date(rx.start).toLocaleString('es-ES',{dateStyle:'short',timeStyle:'short'})}${rx.alb?' · Albarán '+esc(rx.alb):''}${rx.who?' · '+esc(rx.who):''}</p>
+    <p class="mut" style="margin:0 0 8px">${rx.prov?'<b>'+esc(rx.prov)+'</b> · ':''}${new Date(rx.start).toLocaleString('es-ES',{dateStyle:'short',timeStyle:'short'})}${rx.who?' · '+esc(rx.who):''}</p>
+    <input id="rxalb" type="search" value="${esc(rx.alb||'')}" placeholder="Nº de albarán (opcional)" aria-label="Número de albarán" style="margin-bottom:8px">
     <div id="entslot"></div><div id="rxtoast" class="banner" hidden style="color:#fff;margin-top:8px;font-weight:600"></div>
     <div id="rxlines" class="mt"></div>
     <div class="row mt"><button class="pri" data-act="rxend" style="flex:1;min-height:52px">Terminar y guardar</button><button data-act="rxcancel">Descartar</button></div>`;
-    $('#entslot').appendChild($('#camwrap'));$('#offmsg').textContent='Apunta al código cuadrado de cada caja';mode='rx';renderRxLines();
+    $('#rxalb').addEventListener('input',e=>{rx.alb=e.target.value.trim();saveRx()});$('#entslot').appendChild($('#camwrap'));$('#offmsg').textContent='Apunta al código cuadrado de cada caja';mode='rx';renderRxLines();
   }else{
     if(mode==='rx'){mode='scan';$('#scanslot').appendChild($('#camwrap'))}
+    if(entStep&&entStep.startsWith('edit:')){
+      const L=allArr().find(x=>x.id===entStep.slice(5));if(!L){entStep=null;return renderEnt()}
+      const all=PROVS.concat(ls.get('provs',[]));if(!all.includes(L.prov))all.push(L.prov);if(entEditFor!==L.id){entEditFor=L.id;entEditP=L.prov}
+      v.innerHTML=`<h2 style="margin-top:4px">Corregir reparto</h2><p class="mut" style="margin-top:-4px">Apuntado el ${new Date(L.fecha+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}. Toca la empresa correcta o cambia la hora.</p>
+      <div class="pgrid">${all.map(p=>`<button class="pbtn" data-act="arrep" data-p="${esc(p)}" aria-pressed="${p===entEditP}">${esc(p)}</button>`).join('')}</div>
+      <label class="mut" for="arrnew2" style="display:block;margin-top:14px">¿Otra empresa? Escribe el nombre</label><input id="arrnew2" type="search" placeholder="Nombre de la empresa">
+      <label class="mut" for="arrh" style="display:block;margin-top:14px">Hora de llegada</label><input id="arrh" type="time" value="${esc(String(L.hora).padStart(5,'0'))}" style="font-size:20px">
+      <div class="row mt"><button class="pri" data-act="arrsave" style="flex:1;min-height:56px;font-size:18px">Guardar cambios</button></div>
+      <div class="row mt"><button data-act="arrcancel" style="flex:1;min-height:48px">Volver sin cambiar</button><button data-act="arrdel" style="flex:1;min-height:48px;color:#C62828">Borrar este reparto</button></div>`;return}
+    if(entStep==='pick'){
+      const all=PROVS.concat(ls.get('provs',[]));
+      v.innerHTML=`<h2 style="margin-top:4px">¿De qué empresa es el reparto?</h2><p class="mut" style="margin-top:-4px">Toca la empresa. Se apunta la hora ahora mismo.</p>
+      <div class="pgrid">${all.map(p=>`<button class="pbtn" data-act="arrp" data-p="${esc(p)}">${esc(p)}</button>`).join('')}</div>
+      <label class="mut" for="arrnew" style="display:block;margin-top:16px">¿Otra empresa? Escribe el nombre</label><div class="row" style="flex-wrap:nowrap"><input id="arrnew" type="search" placeholder="Nombre de la empresa" style="flex:1"><button data-act="arrother">Apuntar</button></div>
+      <div class="row mt"><button data-act="arrcancel" style="flex:1;min-height:52px">Volver</button></div>`;return}
+    const today=dayStr(new Date()),revd=new Set(llegadas.filter(l=>l.rev).map(l=>l.id)),pend=allArr().filter(l=>l.fecha===today).sort((a,b)=>String(b.hora).localeCompare(String(a.hora)));
     v.innerHTML=`<h2 style="margin-top:4px">Entradas</h2>
-    <p class="mut" style="margin-top:-4px">Registra lo que llega escaneando cada caja: artículo, cantidad, lote y caducidad. Se guarda en la hoja «Entradas».</p>
-    <label class="mut" for="rxalb">Nº de albarán (opcional)</label><input id="rxalb" type="search" placeholder="Opcional">
-    <label class="mut" for="rxwho" style="display:block;margin-top:10px">Quién recibe</label><input id="rxwho" type="search" value="${esc(ls.get('rxWho',''))}" placeholder="Tu nombre o iniciales">
-    <div class="row mt"><button class="pri" data-act="rxstart" style="flex:1;min-height:56px;font-size:18px">Empezar recepción</button></div>
-    <h2>Caducidades</h2><div class="row" id="cadf"><button data-act="cadf" data-m="3" aria-pressed="true">&lt; 3 meses</button><button data-act="cadf" data-m="6">&lt; 6 meses</button><button data-act="cadf" data-m="0">Caducados</button></div><div id="cadlist" class="mt"><div class="mut">Cargando…</div></div>
-    <h2>Buscar un lote</h2><div class="searchbox"><input id="lotq" type="search" placeholder="Número de lote" aria-label="Buscar lote"></div><div id="lotres"></div>
-    ${rxHist.length?`<h2>Últimas recepciones en este móvil</h2><ul class="list">${rxHist.slice(0,8).map(h=>`<li style="padding:10px 14px"><b>${new Date(h.start).toLocaleDateString('es-ES')}</b>${h.alb?' · Albarán '+esc(h.alb):''}<br><span class="mut">${h.lines} líneas · ${h.units} unidades${h.saved?'':' · pendiente de enviar'}</span></li>`).join('')}</ul>`:''}`;
-    $('#lotq').addEventListener('input',e=>lotSearch(e.target.value));loadEntRows();
+    ${entFlash}
+    ${hoyBox()}
+    <button class="pri bigb" data-act="arr">${TRUCK} Ha llegado un reparto</button>
+    ${pend.length?`<h2 style="margin-top:18px">Repartos de hoy</h2>`:''}
+    ${pend.map(l=>{const done=revd.has(l.id);return `<div class="arrc${done?' done':''}"><div class="row" style="justify-content:space-between;flex-wrap:nowrap;align-items:center"><div><b>${esc(l.prov)}</b> · ${esc(l.hora)}<br><span class="mut">${done?'✓ Revisado':'Sin revisar'}</span></div><button data-act="arred" data-id="${esc(l.id)}" style="min-height:44px">Corregir</button></div>${done?'':`<button class="pri" data-act="rxstart" data-arr="${esc(l.id)}">Revisar lo que ha llegado</button>`}</div>`}).join('')}
+    <label class="mut" for="rxwho" style="display:block;margin-top:14px">Tu nombre</label><input id="rxwho" type="search" value="${esc(ls.get('rxWho',''))}" placeholder="Nombre o iniciales">
+    <button data-act="rxstart" style="width:100%;min-height:48px;margin-top:10px">Revisar una entrada sin reparto apuntado</button>
+    <h2 style="margin-top:26px">Consultar</h2>
+    <div style="--k:var(--brand)">
+    ${esec('cad','Caducidades próximas',`<div class="row" id="cadf"><button data-act="cadf" data-m="3" aria-pressed="true">&lt; 3 meses</button><button data-act="cadf" data-m="6">&lt; 6 meses</button><button data-act="cadf" data-m="0">Caducados</button></div><div id="cadlist" class="mt"><div class="mut">Cargando…</div></div>`)}
+    ${esec('lot','Buscar un lote',`<div class="searchbox"><input id="lotq" type="search" placeholder="Número de lote" aria-label="Buscar lote"></div><div id="lotres"></div>`)}
+    ${esec('hor','Horarios de los repartos',horariosHTML())}
+    ${esec('ant','Repartos de los últimos 7 días',anterioresHTML())}
+    ${rxHist.length?esec('his','Últimas recepciones en este móvil',`<ul class="list">${rxHist.slice(0,8).map(h=>`<li style="padding:10px 14px"><b>${new Date(h.start).toLocaleDateString('es-ES')}</b>${h.prov?' · '+esc(h.prov):''}${h.alb?' · Albarán '+esc(h.alb):''}<br><span class="mut">${h.lines} líneas · ${h.units} unidades${h.saved?'':' · pendiente de enviar'}</span></li>`).join('')}</ul>`):''}
+    </div>`;
+    $('#rxwho').addEventListener('change',e=>ls.set('rxWho',e.target.value.trim()));
+    if($('#lotq'))$('#lotq').addEventListener('input',e=>lotSearch(e.target.value));
+    if($('#cadlist')||$('#lotq'))loadEntRows();
+    if(!entRepLoaded)loadRepartos();
   }
 }
 async function loadEntRows(){
   let rows=[];
   if(hojaOK()){try{const r=await fetch(cfg.url+(cfg.url.includes('?')?'&':'?')+'tipo=entradas&clave='+encodeURIComponent(cfg.clave));const j=await r.json();if(j.ok)rows=j.filas||[]}catch(e){}}
-  const loc=ls.get('rxLocal',[]);entRows=rows.length?rows:loc;cadFilter(3);
+  const loc=ls.get('rxLocal',[]);entRows=rows.length?rows:loc;cadFilter(cadM);const q=$('#lotq');if(q&&q.value)lotSearch(q.value);
 }
 let cadM=3;
-function cadFilter(m){cadM=m;document.querySelectorAll('#cadf button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.m===m));const box=$('#cadlist');if(!box)return;
+function cadFilter(m){cadM=m;if(!$('#cadf'))return;document.querySelectorAll('#cadf button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.m===m));const box=$('#cadlist');if(!box)return;
   if(!entRows||!entRows.length){box.innerHTML='<div class="empty">Aún no hay entradas registradas.</div>';return}
   const rs=entRows.filter(r=>{const x=monthsLeft(r.cad);return x!==null&&(m===0?x<0:x>=0&&x<m)}).sort((a,b)=>a.cad.localeCompare(b.cad));
   box.innerHTML=rs.length?`<ul class="list">${rs.slice(0,100).map(r=>{const md=BY[r.k];return `<li style="padding:10px 14px"><div class="row" style="justify-content:space-between;flex-wrap:nowrap"><b style="flex:1">${esc(r.med)}</b>${cadBadge(r.cad)}</div><span class="mut">${md?esc(md.u)+' · ':r.u?esc(r.u)+' · ':''}Lote ${esc(r.lote||'—')} · Cad ${fmtCad(r.cad)} · ${esc(r.qty)} ud · entró ${esc(String(r.fecha).slice(0,10))}</span></li>`}).join('')}</ul>`:'<div class="empty">Nada en este rango.</div>'}
-function lotSearch(q){const box=$('#lotres');q=q.trim().toUpperCase();if(!q){box.innerHTML='';return}
+function lotSearch(q){const box=$('#lotres');if(!box)return;q=q.trim().toUpperCase();if(!q){box.innerHTML='';return}
   const rs=(entRows||[]).filter(r=>String(r.lote).toUpperCase().includes(q));
   box.innerHTML=rs.length?`<ul class="list">${rs.slice(0,50).map(r=>`<li style="padding:10px 14px"><b>${esc(r.med)}</b><br><span class="mut">Lote ${esc(r.lote)} · Cad ${fmtCad(r.cad)} · ${esc(r.qty)} ud · entró ${esc(String(r.fecha).slice(0,10))}${r.alb?' · Albarán '+esc(r.alb):''}${r.u?' · '+esc(r.u):''}</span></li>`).join('')}</ul>`:'<div class="empty">No hay entradas con ese lote.</div>'}
 async function rxEnd(){
   if(!rx)return;const lines=rx.lines.filter(l=>l.qty>0);
-  const rows=lines.map(l=>{const m=BY[l.k];return{fecha:rx.start.slice(0,10),alb:rx.alb,who:rx.who,code:l.code?(isCN(l.code)?l.code:l.code.slice(1)):'',sap:m?m.sap:'',med:m?m.pa:l.name,u:m?m.u:'',grupo:m?GROUPS[zone(m.u).g]:'',lote:l.lote,cad:l.cad,qty:l.qty,k:l.k,rx:rx.id}});
+  const rows=lines.map(l=>{const m=BY[l.k];return{fecha:rx.start.slice(0,10),alb:rx.alb,who:rx.who,code:l.code?(isCN(l.code)?l.code:l.code.slice(1)):'',sap:m?m.sap:'',med:m?m.pa:l.name,u:m?m.u:'',grupo:m?GROUPS[zone(m.u).g]:'',lote:l.lote,cad:l.cad,qty:l.qty,k:l.k,rx:rx.id,prov:rx.prov||''}});
   const loc=ls.get('rxLocal',[]);ls.set('rxLocal',[...rows,...loc].slice(0,3000));
   let saved=false;
   if(hojaOK()&&rows.length){try{const r=await fetch(cfg.url,{method:'POST',body:JSON.stringify({accion:'entradas',clave:cfg.clave,filas:rows})});const j=await r.json();saved=!!j.ok}catch(e){}}
   if(!saved&&rows.length){const pend=ls.get('rxPend',[]);pend.push(rows);ls.set('rxPend',pend)}
-  rxHist.unshift({start:rx.start,alb:rx.alb,lines:rows.length,units:rows.reduce((a,r)=>a+r.qty,0),saved});ls.set('rxHist',rxHist.slice(0,30));
+  if(rx.arr){const L=llegadas.find(x=>x.id===rx.arr);if(L){L.rev=1;L.rx=rx.id;ls.set('llegadas',llegadas)}}
+  rxHist.unshift({start:rx.start,alb:rx.alb,prov:rx.prov||'',rx:rx.id,lines:rows.length,units:rows.reduce((a,r)=>a+r.qty,0),saved});ls.set('rxHist',rxHist.slice(0,30));
   if(stream)stopCam();rx=null;saveRx();renderEnt();
   const b=$('#v-ent');b.insertAdjacentHTML('afterbegin',`<div class="${saved||!rows.length?'ok':'note'}" style="margin-bottom:10px">${rows.length?(saved?'✓ Recepción guardada en la hoja «Entradas».':'Recepción guardada en el móvil. Se enviará a la hoja cuando haya conexión.'):'Recepción vacía: no se ha guardado nada.'}</div>`);
 }
+const PROVS=['Integra2','Maresa Logística','RDA','DHL','Nacex','Movianto'];
+const TRUCK='<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 4h13v12H1zM14 8h4l4 4v4h-8z"/><circle cx="5.5" cy="18.5" r="2"/><circle cx="17.5" cy="18.5" r="2"/></svg>';
+let llegadas=ls.get('llegadas',[]),repRows=[],entRepLoaded=false,entStep=null,entFlash='',entOpen=new Set(),arrT={};
+const DIAS=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const dayStr=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const hm=d=>String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+const toMin=h=>{const m=/^(\d{1,2}):(\d{2})/.exec(h||'');return m?+m[1]*60+ +m[2]:null};
+const fromMin=x=>Math.floor(x/60)+':'+String(x%60).padStart(2,'0');
+function esec(id,title,body){const o=entOpen.has(id);return `<button class="shead" data-act="entsec" data-s="${id}" aria-expanded="${o}"><span class="sn" style="padding-left:8px;font-size:15px">${title}</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>${o?`<div style="padding:4px 2px 10px">${body}</div>`:''}`}
+function arrLog(prov){const d=new Date(),who=(ls.get('rxWho','')||'').trim();
+  const l={id:'L'+d.getTime().toString(36),fecha:dayStr(d),hora:hm(d),dia:DIAS[d.getDay()],prov,who};
+  llegadas.unshift(l);llegadas=llegadas.slice(0,400);ls.set('llegadas',llegadas);vib();entStep=null;
+  entFlash=`<div class="ok" id="arrok" style="font-size:17px">✓ Apuntado: <b>${esc(prov)}</b> a las ${l.hora}. <button data-act="arrundo" data-id="${l.id}" style="margin-left:6px;min-height:36px">Deshacer</button></div>`;
+  arrT[l.id]=setTimeout(()=>{delete arrT[l.id];arrSend()},12000);renderEnt();setTimeout(()=>{const o=$('#arrok');if(o){const u=o.querySelector('button');if(u)u.remove()}},12000)}
+function arrUndo(id){if(!arrT[id])return;clearTimeout(arrT[id]);delete arrT[id];llegadas=llegadas.filter(x=>x.id!==id);ls.set('llegadas',llegadas);entFlash='<div class="note" style="margin-top:10px">Borrado. No se ha apuntado nada.</div>';renderEnt()}
+async function arrSend(){if(!hojaOK())return;const rows=llegadas.filter(l=>!l.sent&&!arrT[l.id]);if(!rows.length)return;
+  try{const r=await fetch(cfg.url,{method:'POST',body:JSON.stringify({accion:'reparto',clave:cfg.clave,filas:rows.map(({id,fecha,hora,dia,prov,who})=>({id,fecha,hora,dia,prov,who}))})});const j=await r.json();if(j.ok){rows.forEach(l=>l.sent=1);ls.set('llegadas',llegadas)}}catch(e){}}
+async function loadRepartos(){entRepLoaded=true;if(!hojaOK())return;try{const r=await fetch(cfg.url+(cfg.url.includes('?')?'&':'?')+'tipo=repartos&clave='+encodeURIComponent(cfg.clave));const j=await r.json();if(j.ok){repRows=j.filas||[];if(!rx&&!entStep&&$('#v-ent')&&!$('#v-ent').hidden)renderEnt()}}catch(e){}}
+let entEditP='',entEditFor='';
+function anterioresHTML(){const lim=dayStr(new Date(Date.now()-7*864e5)),rs=allArr().filter(r=>r.fecha>=lim).sort((a,b)=>(b.fecha+String(b.hora).padStart(5,'0')).localeCompare(a.fecha+String(a.hora).padStart(5,'0')));
+  return rs.length?`<ul class="list">${rs.map(r=>`<li class="row" style="padding:8px 12px;justify-content:space-between;flex-wrap:nowrap"><span><b>${esc(r.prov)}</b><br><span class="mut">${new Date(r.fecha+'T12:00:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})} · ${esc(r.hora)}</span></span><button data-act="arred" data-id="${esc(r.id)}">Corregir</button></li>`).join('')}</ul>`:'<div class="empty">No hay repartos apuntados estos días.</div>'}
+async function arrEdit(id,ch){
+  const L=llegadas.find(x=>x.id===id),R=repRows.find(x=>x.id===id),base=L||R;if(!base)return;
+  if(!ch.borrar&&!ch.hora)ch.hora=base.hora;
+  const local=L&&!L.sent;
+  if(ch.borrar){if(arrT[id]){clearTimeout(arrT[id]);delete arrT[id]}llegadas=llegadas.filter(x=>x.id!==id);repRows=repRows.filter(x=>x.id!==id)}
+  else{for(const o of [L,R])if(o){o.prov=ch.prov;o.hora=ch.hora}if(rx&&rx.arr===id){rx.prov=ch.prov;saveRx()}if(L&&L.rx){const loc=ls.get('rxLocal',[]);loc.forEach(r=>{if(r.rx===L.rx)r.prov=ch.prov});ls.set('rxLocal',loc);rxHist.forEach(h=>{if(h.rx===L.rx)h.prov=ch.prov});ls.set('rxHist',rxHist)}}
+  ls.set('llegadas',llegadas);
+  if(!local){const ed={id,prov:ch.prov||'',hora:ch.hora||'',borrar:ch.borrar?1:0,rx:L&&L.rx||''};const q=ls.get('repEdits',[]).filter(x=>x.id!==id||ed.borrar);q.push(ed);ls.set('repEdits',q);editFlush()}
+  entStep=null;entEditFor='';entFlash=`<div class="ok" style="font-size:17px">${ch.borrar?'✓ Reparto borrado.':'✓ Corregido: <b>'+esc(ch.prov)+'</b> a las '+esc(ch.hora)+'.'}</div>`;renderEnt()}
+async function editFlush(){if(!hojaOK())return;const q=ls.get('repEdits',[]);if(!q.length)return;const left=[];
+  for(const ed of q){try{const r=await fetch(cfg.url,{method:'POST',body:JSON.stringify({accion:'repartoEditar',clave:cfg.clave,...ed})});const j=await r.json();if(!j.ok)left.push(ed)}catch(e){left.push(ed)}}ls.set('repEdits',left)}
+window.addEventListener('online',editFlush);setTimeout(editFlush,6000);
+function allArr(){const m=new Map();for(const r of repRows)if(r.id)m.set(r.id,r);for(const l of llegadas)m.set(l.id,l);return [...m.values()]}
+function pct(a,p){const i=(a.length-1)*p,lo=Math.floor(i),hi=Math.ceil(i);return Math.round(a[lo]+(a[hi]-a[lo])*(i-lo))}
+function stats(prov,dow){const all=allArr().filter(r=>r.prov===prov&&toMin(r.hora)!==null);
+  const day=all.filter(r=>new Date(r.fecha+'T12:00:00').getDay()===dow);const use=day.length>=3?day:all;if(use.length<3)return null;
+  const t=use.map(r=>toMin(r.hora)).sort((a,b)=>a-b);const r5=x=>Math.round(x/5)*5;
+  const days=new Set(all.map(r=>new Date(r.fecha+'T12:00:00').getDay()));
+  return{from:r5(pct(t,.25)),to:r5(pct(t,.75)),n:use.length,byDay:use===day,days}}
+function hoyBox(){const d=new Date(),dow=d.getDay(),today=dayStr(d),now=d.getHours()*60+d.getMinutes(),all=allArr();
+  const provs=[...new Set(all.map(r=>r.prov))];const lines=[];
+  for(const p of provs){const st=stats(p,dow);const came=all.filter(r=>r.prov===p&&r.fecha===today).sort((a,b)=>a.hora.localeCompare(b.hora));
+    if(came.length){lines.push(`<div>✓ <strong>${esc(p)}</strong> ha llegado a las ${esc(came[came.length-1].hora)}</div>`);continue}
+    if(!st||(st.days.size&&!st.days.has(dow)))continue;
+    const late=now>st.to+20;lines.push(`<div>${late?'⏰':'·'} <strong>${esc(p)}</strong> suele llegar ${fromMin(st.from)}–${fromMin(st.to)}${late?' <span class="cb" style="background:#E0A800;color:#1B1400">va con retraso</span>':''}</div>`)}
+  return lines.length?`<div class="tile" style="margin:6px 0 12px;font-size:15px;line-height:1.6"><small>HOY, ${DIAS[dow].toUpperCase()}</small>${lines.join('')}</div>`:''}
+function horariosHTML(){const all=allArr(),provs=[...new Set(all.map(r=>r.prov))].sort();
+  if(!provs.length)return'<div class="empty">Cuando apuntéis unas cuantas llegadas, aquí verás a qué hora suele llegar cada empresa.</div>';
+  return `<ul class="list">${provs.map(p=>{const n=all.filter(r=>r.prov===p).length;const days=[1,2,3,4,5,6,0].map(dw=>{const st=stats(p,dw);return st&&st.byDay?`${DIAS[dw].slice(0,3)} ${fromMin(st.from)}–${fromMin(st.to)}`:''}).filter(Boolean);const g=stats(p,-1);
+    return `<li style="padding:10px 14px"><b>${esc(p)}</b> <span class="mut">· ${n} llegada${n===1?'':'s'} apuntada${n===1?'':'s'}</span><br><span class="mut">${g?'En general: '+fromMin(g.from)+'–'+fromMin(g.to):'Faltan datos (mínimo 3 llegadas)'}${days.length?'<br>'+days.join(' · '):''}</span></li>`}).join('')}</ul>`}
+window.addEventListener('online',arrSend);setTimeout(arrSend,5000);
 async function rxFlushPend(){const pend=ls.get('rxPend',[]);if(!pend.length||!hojaOK())return;const left=[];for(const rows of pend){try{const r=await fetch(cfg.url,{method:'POST',body:JSON.stringify({accion:'entradas',clave:cfg.clave,filas:rows})});const j=await r.json();if(!j.ok)left.push(rows)}catch(e){left.push(rows)}}ls.set('rxPend',left)}
 window.addEventListener('online',rxFlushPend);setTimeout(rxFlushPend,4000);
 
