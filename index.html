@@ -169,6 +169,7 @@ fetch('meds.json').then(r=>r.json()).then(rows=>{
 }).catch(()=>{$('#out').innerHTML='<div class="empty">No se ha podido cargar el listado.</div>'});
 
 function search(q){
+  {const d=q.replace(/\D/g,'');if(/^\d{8,14}$/.test(q.trim())){const g='G'+d.padStart(14,'0');if(links.has(g)&&BY[links.get(g).k])return[BY[links.get(g).k]]}}
   const d=q.replace(/\D/g,'');if(/^\d{6,7}$/.test(q.trim())&&links.has(d.slice(0,6))&&BY[links.get(d.slice(0,6)).k])return[BY[links.get(d.slice(0,6)).k]];
   const qt=toks(q);if(!qt.length)return[];const res=[];
   for(const m of MEDS){let ok=true,ex=0;for(const t of qt){let hit=false;for(const v of m.t){if(v===t){hit=true;ex++;break}if(v.startsWith(t))hit=true}if(!hit){ok=false;break}}if(ok)res.push([ex,m])}
@@ -186,7 +187,11 @@ function matchText(text){
 
 /* ---------- vistas comunes ---------- */
 function chip(m){const z=zone(m.u);return `<span class="chip" style="--k:${gcol(z.g)}">${esc(m.u)}</span>`}
-function cnFor(k){for(const [c,v] of links)if(v.k===k)return c;return ''}
+const isCN=c=>/^\d{6}$/.test(c);
+const keyLabel=c=>isCN(c)?'CN '+c:'código '+String(c).slice(1);
+function fKey(raw){const v=String(raw).replace(/\x1d/g,'');let m=v.match(/^(?:\]d2)?01(\d{14})/);let g=m?m[1]:'';if(!g){const d=v.replace(/\D/g,'');if(d.length===v.length&&[8,12,13,14].includes(d.length))g=d.padStart(14,'0')}if(!g||/^0?847000/.test(g)||/^0847000/.test(g))return '';return 'G'+g}
+function cnFor(k){for(const [c,v] of links)if(v.k===k&&isCN(c))return c;return ''}
+function codeFor(k){for(const [c,v] of links)if(v.k===k&&!isCN(c))return c.slice(1);return ''}
 function codes(m){return `CN: ${esc(cnFor(m.k))}${m.sap?' · SAP: '+esc(m.sap):''}`}
 function itemList(ms,act='show'){return `<ul class="list">${ms.map(m=>`<li><button class="item" data-act="${act}" data-k="${esc(m.k)}">${chip(m)}<span><span class="t">${esc(m.pa)}${m.extra?' <span style="font-size:11px;font-weight:700;color:#8A5A00;background:#FFF4C2;border-radius:6px;padding:1px 6px">AÑADIDO</span>':''}</span><span class="s">${esc(m.den||m.note)}</span><span class="s">${codes(m)}</span></span></button></li>`).join('')}</ul>`}
 const ICON={
@@ -216,7 +221,7 @@ function resultHTML(m,why,extra=''){
   <div class="rzone"><b>${esc(m.u)}</b><span>${esc(z.name)}</span></div></div>
   <div class="rsheet">${frio}${cimaSlot(cn,m.k)}
   <div><div class="rname">${esc(m.pa)}</div>${m.den?`<div class="mut" style="font-size:15px">${esc(m.den)}</div>`:''}${m.note?`<div class="mut" style="font-size:15px"><b>Dónde:</b> ${esc(m.note)}</div>`:''}</div>
-  <div class="tiles"><div class="tile"><small>CN</small><b style="color:${cn?'var(--brand)':'#8AA396'}">${cn?esc(cn):'—'}</b></div><div class="tile"><small>SAP</small><b>${esc(m.sap||'—')}</b></div></div>
+  <div class="tiles">${!cn&&codeFor(m.k)?`<div class="tile"><small>Código (sin CN)</small><b style="font-size:16px;color:var(--brand)">${esc(codeFor(m.k))}</b></div>`:`<div class="tile"><small>CN</small><b style="color:${cn?'var(--brand)':'#8AA396'}">${cn?esc(cn):'—'}</b></div>`}<div class="tile"><small>SAP</small><b>${esc(m.sap||'—')}</b></div></div>
   <div class="rbtns"><button class="pri" data-act="next">Siguiente caja <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>${assign}${extra}</div></div>`;
 }
 function showRes(k,why,extra){
@@ -282,12 +287,12 @@ async function readCodes(src){
 }
 async function scanBarcode(){
   if(locked||!stream||bcBusy||video.readyState<2)return;bcBusy=true;
-  try{for(const raw of await readCodes()){const cn=cnFromBarcode(raw);if(cn){gotCN(cn,'el código de la caja');break}}}catch(e){}
-  bcBusy=false;tip();
+  try{for(const raw of await readCodes()){const cn=cnFromBarcode(raw)||fKey(raw);if(cn){gotCN(cn,isCN(cn)?'el código de la caja':'su código de barras');break}}}catch(e){}
+  bcBusy=false;tip();autoGoogle();
 }
 function gotCN(cn,how){
   if(locked)return;
-  if(links.has(cn)&&BY[links.get(cn).k]){pendingCN='';lock(links.get(cn).k,`Reconocido por ${how} (CN ${cn})`);return}
+  if(links.has(cn)&&BY[links.get(cn).k]){pendingCN='';lock(links.get(cn).k,`Reconocido por ${how} (${keyLabel(cn)})`);return}
   locked='cn';clearInterval(bcT);clearTimeout(loopT);pendingCN=cn;vib();cnPanel();
 }
 async function tick(){
@@ -303,6 +308,7 @@ function handleText(text){
   const cn=cnFromText(text);if(cn){gotCN(cn,'su código nacional');if(locked)return}
   if(text.trim().length>8)lastText=text;
   if(mode==='cn')return;
+  tryCimaText(text);
   const c=matchText(text);
   if(!c.length){skipK=null;hist.push(null);if(hist.length>4)hist.shift();if(hist.length===4&&hist.every(x=>x===null)){$('#out').innerHTML='';if(Date.now()-scanT0<8000)state('Buscando… acerca la caja y que se lea el nombre',true)}return}
   if(skipK&&c[0].m.k===skipK&&Date.now()<skipUntil)return;
@@ -320,7 +326,6 @@ function lock(k,why){
   showRes(k,'✓ '+why,lastText?`<button data-act="alts">No es este</button>`:'');
 }
 function link(cn,k){
-  for(const [c,v] of [...links])if(v.k===k&&c!==cn)links.delete(c);
   links.set(cn,{k,n:nameOf(BY[k])});ls.set('cnLinks',Object.fromEntries(links));renderCN();queueSave(cn,k);
 }
 $('#start').onclick=startCam;$('#stop').onclick=stopCam;
@@ -331,9 +336,10 @@ $('#snap').onclick=async()=>{
     let img=null;
     try{if('ImageCapture' in window){const bl=await new ImageCapture(track).takePhoto();img=await createImageBitmap(bl)}}catch(e){}
     if(!img){const c=document.createElement('canvas');c.width=video.videoWidth;c.height=video.videoHeight;c.getContext('2d').drawImage(video,0,0);img=c}
-    for(let k=0;k<3&&!locked;k++){for(const raw of await readCodes(img)){const cn=cnFromBarcode(raw);if(cn){gotCN(cn,'el código de la caja');break}}}
-    if(!locked&&ocr){for(let k=0;k<2&&!locked;k++){const f=frame(img);const {data}=await ocr.recognize(f);handleText(data.text)}}
-    if(!locked){scanT0=Date.now();state('Tampoco con la foto. Acércala más o escribe el nombre o el CN abajo',false)}
+    for(let k=0;k<3&&!locked;k++){for(const raw of await readCodes(img)){const cn=cnFromBarcode(raw)||fKey(raw);if(cn){gotCN(cn,'el código de la caja');break}}}
+    if(!locked&&hojaOK()){state('Leyendo la caja con el lector de Google…',true);const txt=await googleOCR(img);if(txt&&!locked){const cn=cnFromText(txt);if(cn)gotCN(cn,'su código nacional');if(!locked){lastText=txt;await tryCimaText(txt,true)}if(!locked){const c=matchText(txt);if(c.length&&(!c[1]||c[0].s>=c[1].s*1.3))lock(c[0].m.k,'Reconocido por el nombre de la caja');else if(c.length&&!$('#out').innerHTML.trim())$('#out').innerHTML=itemList(c.slice(0,4).map(x=>x.m),'pick')}}}
+    if(!locked&&ocr&&!$('#out').innerHTML.trim()){for(let k=0;k<2&&!locked;k++){const f=frame(img);const {data}=await ocr.recognize(f);handleText(data.text)}}
+    if(!locked&&!$('#out').innerHTML.trim()){scanT0=Date.now();state('Tampoco con la foto. Acércala más o escribe el nombre o el CN abajo',false)}
   }catch(e){state('No se pudo hacer la foto',false)}
   b.disabled=false;if(!locked&&stream){bcT=setInterval(scanBarcode,300);loopT=setTimeout(tick,600)}
 };
@@ -349,10 +355,10 @@ document.addEventListener('click',e=>{
   const a=b.dataset.act,k=b.dataset.k;
   if(a==='show'){locked=k;clearInterval(bcT);clearTimeout(loopT);state(pendingCN?`Consulta manual · CN ${pendingCN} pendiente de asignar`:'Consulta manual',false);$('#q').value='';$('#sres').innerHTML='';showRes(k,pendingCN?`Consulta manual · CN ${pendingCN} pendiente`:'Consulta manual')}
   else if(a==='pick'){lock(k,'Elegido')}
-  else if(a==='assign'){const cn=pendingCN;link(cn,k);pendingCN='';showRes(k,`✓ CN ${cn} asignado`)}
+  else if(a==='assign'){const cn=pendingCN;link(cn,k);pendingCN='';showRes(k,`✓ ${keyLabel(cn).replace(/^./,x=>x.toUpperCase())} asignado`)}
   else if(a==='alts'){hideRes();const c=matchText(lastText).map(x=>x.m).filter(m=>m.k!==locked);$('#out').innerHTML=c.length?'<p class="mut">Otras coincidencias:</p>'+itemList(c,'pick'):'<div class="empty">No hay otras coincidencias. Búscalo escribiendo abajo.</div>';locked=null}
   else if(a==='next'){const from=prevView;hideRes();if(from!=='scan'){locked=null;return}skipK=locked;skipUntil=Date.now()+6000;pendingCN='';lastText='';$('#out').innerHTML='';stream?(resume(),state('Buscando la siguiente caja…',true)):state('Cámara apagada',false)}
-  else if(a==='cnpick'){const cn=pendingCN;link(cn,k);pendingCN='';$('#out').innerHTML='';locked=k;showRes(k,`✓ CN ${cn} asignado`)}
+  else if(a==='cnpick'){const cn=pendingCN;link(cn,k);pendingCN='';$('#out').innerHTML='';locked=k;showRes(k,`✓ ${keyLabel(cn).replace(/^./,x=>x.toUpperCase())} asignado`)}
   else if(a==='undoeq'){const cn=b.dataset.cn;links.delete(cn);ls.set('cnLinks',Object.fromEntries(links));renderCN();queueRemove(cn);noAuto.add(cn);hideRes('scan');pendingCN=cn;locked='cn';cnPanel()}
   else if(a==='addmed'){addForm(b.dataset.cn,b.dataset.guess)}
   else if(a==='adg'){addG=b.dataset.g;document.querySelectorAll('#adgrp button').forEach(x=>{const on=x.dataset.g===addG;x.setAttribute('aria-pressed',on);x.style.background=on?'var(--k)':'';x.style.color=on?'var(--kf,#fff)':'';x.style.borderColor=on?'transparent':''});$('#adz').innerHTML=zoneOpts(addG)}
@@ -362,6 +368,7 @@ document.addEventListener('click',e=>{
     const m=addMed({k,u,pa,den,sap});if(!m)return;m.extra=true;saveExtras();
     if(cn){link(cn,k)}else{queue.push({accion:'guardar',cn:'X'+k.slice(1),k,sap,pa,den,ubic:u,grupo:GROUPS[zone(u).g],cima:'',check:'Añadido a mano (no está en la guía)'});ls.set('colaHoja',queue);flush()}
     pendingCN='';$('#out').innerHTML='';locked=k;renderUbic();showRes(k,'✓ Añadido a la lista')}
+  else if(a==='melist'){$('#cnres').innerHTML=itemList(MEDS.filter(m=>m.u==='M.E.').sort((a,b)=>a.pa.localeCompare(b.pa)),'cnpick');b.remove()}
   else if(a==='cnnext'){pendingCN='';lastText='';$('#out').innerHTML='';locked=null;stream?(resume(),state('Buscando… apunta al nombre o al código',true)):state('Cámara apagada',false)}
   else if(a==='cnmanual'){const v=($('#cnin').value||'').replace(/\D/g,'').slice(0,6);if(v.length!==6){$('#cnin').focus();return}go('scan');pendingCN=v;locked='cn';cnPanel()}
   else if(a==='unlink'){if(b.dataset.sure){const lk=links.get(b.dataset.cn);links.delete(b.dataset.cn);ls.set('cnLinks',Object.fromEntries(links));if(lk&&BY[lk.k]&&BY[lk.k].extra)removeExtra(lk.k);renderCN();queueRemove(b.dataset.cn)}else{b.dataset.sure=1;b.textContent='¿Seguro?'}}
@@ -463,7 +470,8 @@ let cfg=ls.get('hoja',{url:'',clave:''}),queue=ls.get('colaHoja',[]),lastSync=0,
 const hojaOK=()=>/^https:\/\/script\.google(usercontent)?\.com\//.test(cfg.url)&&cfg.clave;
 async function queueSave(cn,k){
   const m=BY[k];if(!m)return;const z=zone(m.u);let ci='',ck='';
-  try{const r=await cima(cn);if(r.nombre){ci=r.nombre;const v=compare(r,m);ck=v==='ok'?'Coincide':v==='dose'?'Dosis distinta':'No coincide'}else if(r.none)ck='No está en CIMA'}catch(e){}
+  if(isCN(cn))try{const r=await cima(cn);if(r.nombre){ci=r.nombre;const v=compare(r,m);ck=v==='ok'?'Coincide':v==='dose'?'Dosis distinta':'No coincide'}else if(r.none)ck='No está en CIMA'}catch(e){}
+  if(!isCN(cn))ck='Código extranjero (sin CN)';
   if(m.extra)ck='Añadido a mano (no está en la guía)';
   queue=queue.filter(o=>o.cn!==cn);queue.push({accion:'guardar',cn,k,sap:m.sap,pa:m.pa,den:m.den||m.note,ubic:m.u,grupo:GROUPS[z.g],cima:ci,check:ck});
   ls.set('colaHoja',queue);flush();
@@ -480,7 +488,7 @@ async function flush(){
     }
     const r=await fetch(cfg.url+(cfg.url.includes('?')?'&':'?')+'clave='+encodeURIComponent(cfg.clave));
     const j=await r.json();if(!j.ok)throw new Error(j.error==='clave'?'La clave no coincide con la de la hoja.':'No se ha podido leer la hoja.');
-    const nl=new Map();let addedX=false;for(const f of j.filas||[]){const cn=String(f.cn).replace(/\D/g,'').padStart(6,'0').slice(-6);if(!BY[f.k]&&/^n/.test(f.k)&&f.pa&&f.u&&Z[f.u]){addMed({k:f.k,u:f.u,pa:f.pa,den:f.den,sap:f.sap});addedX=true}if(BY[f.k]&&/^\d{6}$/.test(String(f.cn).trim()))nl.set(cn,{k:f.k,n:nameOf(BY[f.k])})}
+    const nl=new Map();let addedX=false;for(const f of j.filas||[]){const raw=String(f.cn).trim(),cn=/^G\d{14}$/.test(raw)?raw:raw.replace(/\D/g,'').padStart(6,'0').slice(-6);if(!BY[f.k]&&/^n/.test(f.k)&&f.pa&&f.u&&Z[f.u]){addMed({k:f.k,u:f.u,pa:f.pa,den:f.den,sap:f.sap});addedX=true}if(BY[f.k]&&(/^\d{6}$/.test(raw)||/^G\d{14}$/.test(raw)))nl.set(cn,{k:f.k,n:nameOf(BY[f.k])})}
     for(const op of queue){if(op.accion==='guardar')nl.set(op.cn,{k:op.k,n:nameOf(BY[op.k])});else nl.delete(op.cn)}
     links=nl;ls.set('cnLinks',Object.fromEntries(links));if(addedX)saveExtras();lastSync=Date.now();syncErr='';
   }catch(e){syncErr=e&&e.message&&!/fetch|network|json/i.test(e.message)?e.message:'Sin conexión con la hoja. Se guardará cuando vuelva la conexión.'}
@@ -565,13 +573,13 @@ function removeExtra(k){const m=BY[k];if(!m||!m.extra)return;MEDS=MEDS.filter(x=
 let addG='ag';
 async function addForm(cn,guess){
   locked='add';clearInterval(bcT);clearTimeout(loopT);$('#sres').innerHTML='';
-  let r={};if(cn){try{r=await cima(cn)}catch(e){}}
+  let r={};if(cn&&isCN(cn)){try{r=await cima(cn)}catch(e){}}
   const pa=(r.pa&&r.pa.length)?r.pa.map(p=>`${p.n} ${String(p.c).replace(/,0+$/,'').replace(',','.')} ${p.u}`).join(' + ').toUpperCase():(guess||'');
   const den=(r.nombre||'').toUpperCase();
   const fc=r.nombre?formCat(r.nombre):'';
   addG='ag';
   $('#out').innerHTML=`<h2 style="margin-top:10px">Añadir a la lista</h2>
-  <p class="mut" style="margin-top:-4px">No está en la guía. ${cn?`Se guardará con el CN <b>${esc(cn)}</b>`:'Se guardará sin CN'} y quedará marcado para que farmacia lo revise.</p>
+  <p class="mut" style="margin-top:-4px">No está en la guía. ${cn?`Se guardará con el ${isCN(cn)?'CN':'código'} <b>${esc(isCN(cn)?cn:cn.slice(1))}</b>`:'Se guardará sin CN'} y quedará marcado para que farmacia lo revise.</p>
   <label class="mut" for="adpa">Principio activo y dosis</label><input id="adpa" type="search" value="${esc(pa)}" placeholder="p. ej. NAPROXENO SODICO 550 MG">
   <label class="mut" for="adden" style="display:block;margin-top:10px">Nombre comercial</label><input id="adden" type="search" value="${esc(den)}" placeholder="Como pone en la caja">
   <label class="mut" for="adsap" style="display:block;margin-top:10px">Código SAP (si lo sabes)</label><input id="adsap" type="search" inputmode="numeric" placeholder="Opcional">
@@ -582,6 +590,68 @@ async function addForm(cn,guess){
 }
 const zoneOpts=g=>ZONES.filter(z=>z[3]===g).map(z=>`<option value="${esc(z[0])}">${esc(z[0])} · ${esc(z[2])}</option>`).join('');
 function addBtn(cn,guess){return `<div class="row mt"><button data-act="addmed" data-cn="${esc(cn||'')}" data-guess="${esc(guess||'')}" style="border-style:dashed;color:var(--brand);font-weight:700">＋ No está en la guía: añadirlo</button></div>`}
+
+/* ---------- texto de la caja → CIMA por nombre → su par en la guía ---------- */
+const cimaNameCache=new Map();let lastCimaTry=0,lastCimaWords='';
+async function cimaByName(w){if(cimaNameCache.has(w))return cimaNameCache.get(w);let res=[];
+  try{const r=await fetch('https://cima.aemps.es/cima/rest/medicamentos?nombre='+encodeURIComponent(w)+'&pagina=1');if(r.ok){const j=await r.json();res=(j.resultados||[]).slice(0,60).map(x=>({nombre:String(x.nombre||''),vtm:String(x.vtm&&x.vtm.nombre||''),dosis:String(x.dosis||''),lab:String(x.labtitular||''),nreg:String(x.nregistro||'')}))}}catch(e){}
+  cimaNameCache.set(w,res);return res}
+async function cimaFromText(text){
+  const T=toks(text),TS=new Set(T),nums=new Set(T.filter(t=>/^\d/.test(t)).map(t=>numS(t)));
+  const words=[...new Set(T.filter(t=>t.length>=5&&!/\d/.test(t)&&!STOP.has(t)&&!LABS.has(t)&&!COMMON.has(t)))].slice(0,4);
+  if(!words.length)return null;
+  let best=null;
+  for(const w of words){
+    for(const x of await cimaByName(w)){
+      const nt=toks(x.nombre).filter(t=>!/\d/.test(t)&&t.length>=4&&!STOP.has(t));
+      let sc=nt.filter(t=>TS.has(t)).length*2;
+      const dm=x.dosis.match(/(\d+(?:[.,]\d+)?)/);if(dm&&nums.has(numS(dm[1].replace(',','.'))))sc+=3;
+      if(!best||sc>best.sc)best={...x,sc};
+    }
+    if(best&&best.sc>=5)break;
+  }
+  if(!best||best.sc<4)return null;
+  const dm=best.dosis.match(/(\d+(?:[.,]\d+)?)\s*([a-zµ%]+)/i);
+  return {nombre:best.nombre,lab:best.lab,nreg:best.nreg,vtm:best.vtm,pa:best.vtm&&dm&&!/[+\/]| y /.test(best.vtm)?[{n:best.vtm,c:dm[1],u:dm[2]}]:(best.vtm?[{n:best.vtm,c:'',u:''}]:[])};
+}
+const COMMON=new Set(['COMPRIMIDOS','RECUBIERTOS','PELICULA','CAPSULAS','SOLUCION','INYECTABLE','ENVASE','CONTIENE','LEASE','PROSPECTO','ANTES','UTILIZAR','MEDICAMENTO','MEDICAMENTOS','CONSERVAR','TEMPERATURA','ALCANCE','NIÑOS','NINOS','VISTA','ORAL','INTRAVENOSA','SUBCUTANEA','INTRAMUSCULAR','EXCIPIENTES','CADA','LOTE','CADUCIDAD','RECETA','MEDICA','USO','HOSPITALARIO','DISPENSACION','PLUMA','PRECARGADA','JERINGA','VIALES','AMPOLLAS','SOBRES','GASTRORRESISTENTES','LIBERACION','PROLONGADA','DURAS','BLANDAS','EFERVESCENTES','DISPERSABLES','BUCODISPERSABLES','POLVO','PARA','CONCENTRADO','PERFUSION','SUSPENSION','JARABE','GOTAS','CREMA','POMADA','COLIRIO','AEROSOL','INHALACION','ESPAÑA','ESPANA','MADRID','BARCELONA','LABORATORIOS','PHARMA','FARMA','GMBH','LIMITED','LTD','IRELAND','GERMANY']);
+async function tryCimaText(text,force){
+  if(!text||locked)return;const now=Date.now();
+  const sig=toks(text).filter(t=>t.length>=5).slice(0,4).join(' ');
+  if(!force&&(now-lastCimaTry<4000||sig===lastCimaWords))return;lastCimaTry=now;lastCimaWords=sig;
+  const r=await cimaFromText(text);if(!r||locked)return;
+  const eq=r.pa.length&&r.pa[0].c?equivalents(r):[];
+  const keys=[...new Set(r.pa.flatMap(p=>paKeys(p.n)))];
+  const same=keys.length?MEDS.filter(m=>!eq.includes(m)&&keys.some(k=>m.t.includes(k))):[];
+  if(eq.length&&eq.every(e=>e.u===eq[0].u)){
+    const fc=formCat(r.nombre),k=(eq.find(e=>formCat(e.pa+' '+e.den)===fc)||eq[0]).k;
+    lock(k,'Reconocido por el nombre de la caja');
+    const sh=$('#v-res .rsheet');if(sh)sh.insertAdjacentHTML('afterbegin',`<div class="banner bok"><div><b>Según la caja y CIMA:</b> ${esc(r.nombre)}${r.lab?' · '+esc(r.lab):''}. Mismo principio activo y dosis que el de la guía.</div></div>`);
+    return;
+  }
+  if(!eq.length&&!same.length)return;
+  state('Parece '+r.nombre.toLowerCase()+'. ¿Es alguno de estos?',true);
+  $('#out').innerHTML=`<div class="banner bok mt"><div><b>Según la caja y CIMA:</b> ${esc(r.nombre)}${r.lab?' · '+esc(r.lab):''}</div></div>`+
+   (eq.length?'<p class="mut" style="margin:10px 2px 0">Mismo principio activo y dosis:</p>'+itemList(eq.slice(0,6),'pick'):'')+
+   (same.length?'<p class="mut" style="margin:10px 2px 0">Mismo principio activo:</p>'+itemList(same.slice(0,6),'pick'):'');
+}
+/* OCR de Google a través de la hoja (mejor que el del móvil con cajas de colores) */
+let gBusy=false,gLast=0;
+function jpeg64(src,max){const w=src.videoWidth||src.width,h=src.videoHeight||src.height,sc=Math.min(1,max/Math.max(w,h)),c=document.createElement('canvas');c.width=Math.round(w*sc);c.height=Math.round(h*sc);c.getContext('2d').drawImage(src,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.85).split(',')[1]}
+async function googleOCR(src){
+  if(!hojaOK()||gBusy)return'';gBusy=true;gLast=Date.now();
+  try{const r=await fetch(cfg.url,{method:'POST',body:JSON.stringify({accion:'ocr',clave:cfg.clave,img:jpeg64(src,1600)})});const j=await r.json();return j.ok?String(j.texto||''):''}
+  catch(e){return''}finally{gBusy=false}
+}
+async function autoGoogle(){
+  if(!stream||locked||!hojaOK()||gBusy||Date.now()-scanT0<3500||Date.now()-gLast<7000||video.readyState<2)return;
+  const txt=await googleOCR(video);if(!txt||locked||!stream)return;
+  const cn=cnFromText(txt);if(cn){gotCN(cn,'su código nacional');return}
+  lastText=txt;const c=matchText(txt);
+  await tryCimaText(txt,true);if(locked)return;
+  if(c.length&&(!c[1]||c[0].s>=c[1].s*1.4)){lock(c[0].m.k,'Reconocido por el nombre de la caja');return}
+  if(c.length&&!$('#out').innerHTML.trim()){state('¿Es alguno de estos? Toca el correcto o sigue apuntando',true);$('#out').innerHTML=itemList(c.slice(0,3).map(x=>x.m),'pick')}
+}
 
 /* ---------- lector externo (Zebra DataWedge / pistola USB o Bluetooth en modo teclado) ---------- */
 let wbuf='',wlast=0,wstart=0,wfield=null,wbefore='',lastRaw='';
@@ -604,15 +674,31 @@ function handleScan(raw){
   const digits=raw.replace(/\D/g,'');
   let cn=cnFromBarcode(raw);
   if(!cn&&/^\d{6,7}$/.test(digits))cn=digits.slice(0,6);
+  if(!cn&&!BY[digits])cn=fKey(raw);
   if(stream){clearInterval(bcT);clearTimeout(loopT)}
-  if(cn&&links.has(cn)&&BY[links.get(cn).k]){locked=links.get(cn).k;pendingCN='';vib();showRes(locked,`✓ Leído con el lector (CN ${cn})`);return}
+  if(cn&&links.has(cn)&&BY[links.get(cn).k]){locked=links.get(cn).k;pendingCN='';vib();showRes(locked,`✓ Leído con el lector (${keyLabel(cn)})`);return}
   if(BY[digits]){locked=digits;vib();showRes(digits,'✓ Leído con el lector (código SAP)');return}
-  if(cn){go('scan');pendingCN=cn;locked='cn';vib();cnPanel();state(`CN ${cn} leído con el lector: aún no está asignado`,false);return}
+  if(cn){go('scan');pendingCN=cn;locked='cn';vib();cnPanel();state(`${keyLabel(cn)} leído con el lector: aún no está asignado`,false);return}
   go('scan');$('#q').value=raw.replace(/\x1d/g,' ');$('#q').dispatchEvent(new Event('input'));
+}
+
+function codePanel(){
+  const key=pendingCN,code=key.slice(1),cur=links.get(key),m=cur&&BY[cur.k];
+  state('Código de barras sin CN español',false);
+  const sug=lastText?matchText(lastText).map(x=>x.m).slice(0,4):[];
+  $('#sres').innerHTML='';$('#out').innerHTML=`<div class="cnbig" style="margin-top:10px;font-size:26px">${esc(code)} <span class="mut" style="font-size:15px;font-weight:600">· sin CN</span></div>
+  <div class="banner bnone"><div>Este código no es español: suele ser <b>medicación extranjera</b> o un producto sin código nacional. Asócialo una vez y la próxima vez se reconocerá al instante.</div></div>
+  ${m?`<div class="ok">Ya está asociado a <b>${esc(m.pa)}</b> · SAP ${esc(m.sap)} · ${esc(m.u)}.</div>`:''}
+  <div id="cnsug">${sug.length?'<p class="mut">Por lo que se lee en la caja:</p>'+itemList(sug,'cnpick'):''}</div>
+  <div class="mt"><input id="cnq" type="search" placeholder="Busca por nombre o SAP (p. ej. 1402…)" aria-label="Buscar medicamento para el código"></div><div id="cnres"></div>
+  <div class="row mt"><button data-act="melist">Ver medicación extranjera (M.E.)</button></div>
+  ${addBtn(key,'')}<div class="row mt"><button data-act="cnnext">Cancelar y seguir escaneando</button></div>`;
+  $('#cnq').addEventListener('input',e=>{const r=search(e.target.value);$('#cnres').innerHTML=e.target.value.trim()?(r.length?itemList(r.slice(0,15),'cnpick'):'<div class="empty">Nada coincide.</div>'):''});
 }
 
 /* ---------- códigos CN ---------- */
 function cnPanel(){
+  if(!isCN(pendingCN))return codePanel();
   const cn=pendingCN,cur=links.get(cn),m=cur&&BY[cur.k];
   state(`Código leído: CN ${cn}`,false);
   const sug=lastText?matchText(lastText).map(x=>x.m).slice(0,4):[];
@@ -639,7 +725,7 @@ function renderCN(){
   const sec=(id,ico,title,badge,body)=>`<button class="shead" data-act="cnsec" data-s="${id}" aria-expanded="${cnOpen.has(id)}"><span class="sc">${ico}</span><span class="sn">${title}</span><span class="sq">${badge}</span>${chev}</button>${cnOpen.has(id)?`<div class="sbody" style="padding:4px 2px 8px">${body}</div>`:''}`;
   const I=d=>`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
   const hojaBadge=!hojaOK()?'Sin conectar':syncErr?'⚠ Sin conexión':queue.length?queue.length+' pendiente'+(queue.length>1?'s':''):'✓ Conectada';
-  const asig=arr.length?`<ul class="list">${arr.map(([c,m])=>`<li class="row" style="padding:8px 12px;justify-content:space-between"><span>${chip(m)} <b>CN: ${esc(c)}</b> · SAP: ${esc(m.sap)}<br><span class="mut">${esc(m.pa)}</span></span><button data-act="unlink" data-cn="${esc(c)}">Quitar</button></li>`).join('')}</ul>`:'<div class="empty">Todavía no hay ninguno.</div>';
+  const asig=arr.length?`<ul class="list">${arr.map(([c,m])=>`<li class="row" style="padding:8px 12px;justify-content:space-between"><span>${chip(m)} <b>${isCN(c)?'CN: '+esc(c):'Cód.: '+esc(c.slice(1))}</b> · SAP: ${esc(m.sap)}<br><span class="mut">${esc(m.pa)}</span></span><button data-act="unlink" data-cn="${esc(c)}">Quitar</button></li>`).join('')}</ul>`:'<div class="empty">Todavía no hay ninguno.</div>';
   const zebra=`<p class="mut" style="margin-top:4px">Con el lector configurado como teclado (Zebra DataWedge: salida «Keystroke», con Intro al final), basta con escanear en cualquier pantalla de la app: no hace falta la cámara.</p>
   <div class="searchbox"><input id="wtest" type="search" placeholder="Toca aquí y escanea para probar" aria-label="Prueba del lector"></div>
   <p class="mut mt">Último código recibido: <b id="wlast">${esc(lastRaw.replace(/\x1d/g,'⟨GS⟩'))||'ninguno'}</b></p>`;
