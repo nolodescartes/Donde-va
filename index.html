@@ -143,8 +143,6 @@ nav svg{width:24px;height:24px}
   <button data-v="ubic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg>Ubicaciones</button>
 
 </nav>
-<script src="v/tesseract.min.js"></script>
-<script src="v/zxing-reader.js"></script>
 <script>
 {
 /* ---------- ubicaciones y grupos ---------- */
@@ -246,6 +244,11 @@ function hideRes(to){const r=$('#v-res');if(r.hidden&&!to)return;r.hidden=true;r
 let mode='scan',pendingCN='',skipK=null,skipUntil=0,stream=null,track=null,ocr=null,ocrBusy=false,bcBusy=false,locked=null,loopT=null,bcT=null,hist=[],lastText='',torchOn=false,zxReady=null;
 let detector=null;
 (async()=>{try{if('BarcodeDetector' in window){const f=await BarcodeDetector.getSupportedFormats();if(f.includes('data_matrix'))detector=new BarcodeDetector({formats:['data_matrix','ean_13']})}}catch(e){}})();
+function gsHint(r){if(!r||!/^(\]d2)?01\d{14}/.test(r))return'';const many=/10|21/.test(r.slice(16));return r.includes('\x1d')?'<div class="ok">✓ El lector envía el separador: lote y nº de serie se leerán bien.</div>':many?'<div class="note">⚠ El lector no envía el separador. La app intentará separar lote y nº de serie, pero puede fallar: actívalo en el lector (ver abajo).</div>':''}
+const lotSusp=l=>!!l&&(l.length>20||/^[A-Z0-9]{3,}21[A-Z0-9]{8,}$/i.test(l));
+const cfgLink=()=>location.origin+location.pathname+'?hoja='+encodeURIComponent(cfg.url)+'&clave='+encodeURIComponent(cfg.clave);
+const loaded={};function loadJS(src){return loaded[src]||(loaded[src]=new Promise((ok,ko)=>{const e=document.createElement('script');e.src=src;e.onload=ok;e.onerror=()=>{delete loaded[src];ko()};document.head.appendChild(e)}))}
+const libs=()=>Promise.all([loadJS('v/zxing-reader.js'),loadJS('v/tesseract.min.js')]).catch(()=>{});
 function zx(){if(!zxReady&&window.ZXingWASM){ZXingWASM.prepareZXingModule({overrides:{locateFile:(p,pre)=>p.endsWith('.wasm')?new URL('v/'+p,location.href).href:pre+p}});zxReady=true}return zxReady}
 const video=$('#video'),canvas=document.createElement('canvas'),bcan=document.createElement('canvas');
 function state(t,on){$('#msg').textContent=t;$('#dot').classList.toggle('on',!!on)}
@@ -258,7 +261,7 @@ async function startCam(){
     $('#snap').hidden=false;
     $('#off').hidden=true;$('#guide').hidden=false;$('#stop').hidden=false;
     resume();
-    if(!ocr){state('Preparando el lector (solo la primera vez)…',true);
+    if(!ocr){state('Preparando el lector (solo la primera vez)…',true);await libs();if(!window.Tesseract)throw new Error('libs');
       const base=new URL('v',location.href).href;
       ocr=await Tesseract.createWorker('spa',1,{workerPath:base+'/worker.min.js',corePath:base,langPath:base,workerBlobURL:false,gzip:true});
       await ocr.setParameters({tessedit_pageseg_mode:'11'});
@@ -270,7 +273,8 @@ function stopCam(){clearTimeout(loopT);clearInterval(bcT);$('#zoom').hidden=true
 let zoomCap=null,zoomLv=1,bcPass=0,ocrPass=0,scanT0=0;
 function resume(){locked=null;hist=[];scanT0=Date.now();clearInterval(bcT);bcT=setInterval(scanBarcode,300);tick()}
 const TIPS=['Acerca el código cuadrado: que ocupe un tercio del recuadro','Inclina un poco la caja para quitar reflejos','Pulsa el botón de la cámara para una foto nítida','Si hay poca luz, enciende la linterna','Pon la caja plana y quieta un segundo'];
-function tip(){const t=Date.now()-scanT0;if(!locked&&stream&&t>8000)state('Consejo: '+TIPS[Math.floor(t/4000)%TIPS.length],true)}
+let lastAct=0;
+function tip(){const idle=Date.now()-Math.max(scanT0,lastAct);if(stream&&!locked&&idle>(mode==='rx'?180000:90000)){stopCam();state('Cámara apagada para ahorrar batería',false);$('#offmsg').textContent='La cámara se ha apagado sola para ahorrar batería. Pulsa para seguir.';return}const t=Date.now()-scanT0;if(!locked&&stream&&t>8000)state('Consejo: '+TIPS[Math.floor(t/4000)%TIPS.length],true)}
 function prep(c,w,h){c.filter='grayscale(1) contrast(1.4)';return c.filter==='grayscale(1) contrast(1.4)'}
 function gray(c,w,h){const im=c.getImageData(0,0,w,h),d=im.data;for(let i=0;i<d.length;i+=4){let y=.299*d[i]+.587*d[i+1]+.114*d[i+2];y=(y-128)*1.4+128;y=y<0?0:y>255?255:y;d[i]=d[i+1]=d[i+2]=y}c.putImageData(im,0,0)}
 function frame(src){src=src||video;const vw=src.videoWidth||src.width,vh=src.videoHeight||src.height;if(!vw)return null;
@@ -281,7 +285,7 @@ function frame(src){src=src||video;const vw=src.videoWidth||src.width,vh=src.vid
   return canvas}
 function cnFromBarcode(v){v=String(v).replace(/\D/g,'');if(v.length===13&&v.startsWith('847000'))return v.slice(6,12);const i=v.indexOf('08470');if(i>=0&&v.length>=i+14)return v.slice(i+7,i+13);if(v.startsWith('8470')&&v.length>=13)return v.slice(6,12);return ''}
 const cnFromText=t=>{let m=String(t).match(/C\.?\s*N\.?\s*[:.]?\s*(\d{6})/i);if(m)return m[1];m=String(t).replace(/[ O]/g,x=>x==='O'?'0':'').match(/0?847000(\d{6})/);return m?m[1]:''};
-async function readCodes(src){
+async function readCodes(src){if(!window.ZXingWASM&&!detector)await libs();
   src=src||video;const vw=src.videoWidth||src.width,vh=src.videoHeight||src.height;if(!vw)return[];
   const pass=bcPass++%3,out=[];
   // 0: imagen completa · 1: centro ampliado ×2 · 2: mitad superior ampliada (donde suele ir el código)
@@ -298,7 +302,7 @@ async function readCodes(src){
 async function scanBarcode(){
   if(locked||!stream||bcBusy||video.readyState<2)return;bcBusy=true;
   try{for(const raw of await readCodes()){const cn=cnFromBarcode(raw)||fKey(raw);if(cn&&mode==='rx'){rxScan(cn,parseGS1(raw));break}if(cn){gotCN(cn,isCN(cn)?'el código de la caja':'su código de barras');break}}}catch(e){}
-  bcBusy=false;if(mode!=='rx'){tip();autoGoogle()}
+  bcBusy=false;tip();if(mode!=='rx')autoGoogle()
 }
 function gotCN(cn,how){
   if(locked)return;
@@ -402,7 +406,10 @@ document.addEventListener('click',e=>{
   else if(a==='unlink'){if(b.dataset.sure){const lk=links.get(b.dataset.cn);links.delete(b.dataset.cn);ls.set('cnLinks',Object.fromEntries(links));if(lk&&BY[lk.k]&&BY[lk.k].extra)removeExtra(lk.k);renderCN();queueRemove(b.dataset.cn)}else{b.dataset.sure=1;b.textContent='¿Seguro?'}}
   else if(a==='hojasave'){cfg={url:$('#hurl').value.trim(),clave:$('#hclave').value.trim()};ls.set('hoja',cfg);if(!hojaOK()){syncErr='El enlace debe empezar por https://script.google.com/ y hace falta la clave.';renderCN();return}for(const [c,v] of links)if(!queue.some(o=>o.cn===c))queueSave(c,v.k);flush()}
   else if(a==='hojasync')flush();
-  else if(a==='hojalink')copy(location.origin+location.pathname+'?hoja='+encodeURIComponent(cfg.url)+'&clave='+encodeURIComponent(cfg.clave),b);
+  else if(a==='hojalink')copy(cfgLink(),b);
+  else if(a==='hojaqr'){const box=$('#qrbox');if(box.innerHTML){box.innerHTML='';return}loadJS('v/qrcode.min.js').catch(()=>loadJS('https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js')).then(()=>{const q=qrcode(0,'M');q.addData(cfgLink());q.make();
+    box.innerHTML=`<div style="background:#fff;border-radius:16px;padding:14px;margin-top:10px;text-align:center"><div style="max-width:280px;margin:0 auto"><img alt="Código QR para configurar otro móvil" src="${q.createDataURL(8,4)}" style="width:100%;height:auto;image-rendering:pixelated;display:block"></div>
+    <p style="margin:10px 0 0;font-size:15px">En el otro móvil: abre la <b>cámara</b>, enfoca este código y toca el enlace. La app quedará conectada a la hoja.</p><p class="mut" style="margin:6px 0 0;font-size:13px">En iPhone, hazlo antes de añadir la app a la pantalla de inicio.</p></div>`}).catch(()=>box.innerHTML='<div class="note">Sin conexión: no se pudo preparar el código.</div>')}
   else if(a==='hojaoff'){cfg={url:'',clave:''};ls.set('hoja',cfg);renderCN()}
   else if(a==='grp')openGroup(b.dataset.g);
   else if(a==='cnsec'){const id=b.dataset.s;cnOpen.has(id)?cnOpen.delete(id):cnOpen.add(id);renderCN()}
@@ -707,7 +714,7 @@ function rxStart(arr){const L=llegadas.find(x=>x.id===arr);const who=(($('#rxwho
   rx={id:Date.now().toString(36),start:new Date().toISOString(),alb:'',who,prov:L?L.prov:'',arr:L?L.id:'',lines:[],serials:[]};entFlash='';saveRx();renderEnt()}
 function rxFind(key,k,lote,cad){return rx.lines.find(l=>(k?l.k===k:l.code===key)&&l.lote===lote&&l.cad===cad)}
 async function rxScan(key,g,how){
-  if(!rx)return;g=g||{};const now=Date.now();
+  if(!rx)return;lastAct=Date.now();g=g||{};const now=Date.now();
   if(g.serie&&rx.serials.includes((key||'')+'|'+g.serie)){toast('Esta caja ya está contada',true);return}
   if(!g.serie&&rxLast.key===key&&now-rxLast.t<2500)return;rxLast={key,t:now};
   let k=key&&links.has(key)&&BY[links.get(key).k]?links.get(key).k:'';let name=k?BY[k].pa:'';
@@ -726,7 +733,7 @@ function renderRxLines(){
   const n=rx.lines.reduce((a,l)=>a+l.qty,0);$('#rxcount').textContent=`${rx.lines.length} línea${rx.lines.length===1?'':'s'} · ${n} unidad${n===1?'':'es'}`;
   box.innerHTML=rx.lines.length?rx.lines.map(l=>{const m=BY[l.k],z=m?zone(m.u):null;return `<div class="rxl" data-id="${esc(l.id)}">
     <div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap"><div style="flex:1"><div class="t" style="font-weight:700">${esc(l.name)}</div>
-    <div class="mut">${m?chip(m)+' ':'<span class="cb" style="background:#EEF6F1;color:#4F6B5C">sin ubicación</span> '}${l.code?esc(isCN(l.code)?'CN '+l.code:keyLabel(l.code)):''} ${cadBadge(l.cad)}</div></div>
+    <div class="mut">${m?chip(m)+' ':'<span class="cb" style="background:#EEF6F1;color:#4F6B5C">sin ubicación</span> '}${l.code?esc(isCN(l.code)?'CN '+l.code:keyLabel(l.code)):''} ${cadBadge(l.cad)}</div>${lotSusp(l.lote)?'<div class="cb" style="background:#FFF4C2;color:#4A3300;margin:4px 0 0;font-size:12px">⚠ ¿Lote y nº de serie juntos? Revisa el lote</div>':''}</div>
     <div class="qty"><button data-act="rxdec" data-id="${esc(l.id)}" aria-label="Menos">−</button><span>${l.qty}</span><button data-act="rxinc" data-id="${esc(l.id)}" aria-label="Más">+</button></div></div>
     <div class="row" style="margin-top:6px;flex-wrap:nowrap"><input class="rxin" data-f="lote" data-id="${esc(l.id)}" value="${esc(l.lote)}" placeholder="Lote" aria-label="Lote" style="flex:1"><input class="rxin" type="month" data-f="cad" data-id="${esc(l.id)}" value="${esc(l.cad.slice(0,7))}" aria-label="Caducidad" style="flex:1"></div></div>`}).join(''):'<div class="empty">Escanea la primera caja. Cada caja suma 1; la misma caja no se cuenta dos veces.</div>';
 }
@@ -744,7 +751,7 @@ function renderEnt(){
     if(mode==='rx'){mode='scan';$('#scanslot').appendChild($('#camwrap'))}
     if(entStep&&entStep.startsWith('edit:')){
       const L=allArr().find(x=>x.id===entStep.slice(5));if(!L){entStep=null;return renderEnt()}
-      const all=PROVS.concat(ls.get('provs',[]));if(!all.includes(L.prov))all.push(L.prov);if(entEditFor!==L.id){entEditFor=L.id;entEditP=L.prov}
+      const all=provList();if(!all.includes(L.prov))all.push(L.prov);if(entEditFor!==L.id){entEditFor=L.id;entEditP=L.prov}
       v.innerHTML=`<h2 style="margin-top:4px">Corregir reparto</h2><p class="mut" style="margin-top:-4px">Apuntado el ${new Date(L.fecha+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}. Toca la empresa correcta o cambia la hora.</p>
       <div class="pgrid">${all.map(p=>`<button class="pbtn" data-act="arrep" data-p="${esc(p)}" aria-pressed="${p===entEditP}">${esc(p)}</button>`).join('')}</div>
       <label class="mut" for="arrnew2" style="display:block;margin-top:14px">¿Otra empresa? Escribe el nombre</label><input id="arrnew2" type="search" placeholder="Nombre de la empresa">
@@ -752,7 +759,7 @@ function renderEnt(){
       <div class="row mt"><button class="pri" data-act="arrsave" style="flex:1;min-height:56px;font-size:18px">Guardar cambios</button></div>
       <div class="row mt"><button data-act="arrcancel" style="flex:1;min-height:48px">Volver sin cambiar</button><button data-act="arrdel" style="flex:1;min-height:48px;color:#C62828">Borrar este reparto</button></div>`;return}
     if(entStep==='pick'){
-      const all=PROVS.concat(ls.get('provs',[]));
+      const all=provList();
       v.innerHTML=`<h2 style="margin-top:4px">¿De qué empresa es el reparto?</h2><p class="mut" style="margin-top:-4px">Toca la empresa. Se apunta la hora ahora mismo.</p>
       <div class="pgrid">${all.map(p=>`<button class="pbtn" data-act="arrp" data-p="${esc(p)}">${esc(p)}</button>`).join('')}</div>
       <label class="mut" for="arrnew" style="display:block;margin-top:16px">¿Otra empresa? Escribe el nombre</label><div class="row" style="flex-wrap:nowrap"><input id="arrnew" type="search" placeholder="Nombre de la empresa" style="flex:1"><button data-act="arrother">Apuntar</button></div>
@@ -838,6 +845,7 @@ async function arrEdit(id,ch){
 async function editFlush(){if(!hojaOK())return;const q=ls.get('repEdits',[]);if(!q.length)return;const left=[];
   for(const ed of q){try{const r=await fetch(cfg.url,{method:'POST',body:JSON.stringify({accion:'repartoEditar',clave:cfg.clave,...ed})});const j=await r.json();if(!j.ok)left.push(ed)}catch(e){left.push(ed)}}ls.set('repEdits',left)}
 window.addEventListener('online',editFlush);setTimeout(editFlush,6000);
+function provList(){const out=[];for(const p of PROVS.concat(ls.get('provs',[]),allArr().map(r=>r.prov)))if(p&&!out.some(x=>x.toLowerCase()===String(p).toLowerCase()))out.push(String(p));return out}
 function allArr(){const m=new Map();for(const r of repRows)if(r.id)m.set(r.id,r);for(const l of llegadas)m.set(l.id,l);return [...m.values()]}
 function pct(a,p){const i=(a.length-1)*p,lo=Math.floor(i),hi=Math.ceil(i);return Math.round(a[lo]+(a[hi]-a[lo])*(i-lo))}
 function stats(prov,dow){const all=allArr().filter(r=>r.prov===prov&&toMin(r.hora)!==null);
@@ -877,7 +885,7 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='Unidentified'||e.key==='GroupSeparator')wbuf+='\x1d';
 },true);
 function handleScan(raw){
-  lastRaw=raw;const t=$('#wlast');if(t)t.textContent=raw.replace(/\x1d/g,'⟨GS⟩');
+  lastRaw=raw;const t=$('#wlast');if(t)t.textContent=raw.replace(/\x1d/g,'⟨GS⟩');const wg=$('#wgs');if(wg)wg.innerHTML=gsHint(raw);
   if(document.activeElement&&document.activeElement.id==='wtest'){vib();return}
   const digits=raw.replace(/\D/g,'');
   let cn=cnFromBarcode(raw);
@@ -937,9 +945,10 @@ function renderCN(){
   const asig=arr.length?`<ul class="list">${arr.map(([c,m])=>`<li class="row" style="padding:8px 12px;justify-content:space-between"><span>${chip(m)} <b>${isCN(c)?'CN: '+esc(c):'Cód.: '+esc(c.slice(1))}</b> · SAP: ${esc(m.sap)}<br><span class="mut">${esc(m.pa)}</span></span><button data-act="unlink" data-cn="${esc(c)}">Quitar</button></li>`).join('')}</ul>`:'<div class="empty">Todavía no hay ninguno.</div>';
   const zebra=`<p class="mut" style="margin-top:4px">Con el lector configurado como teclado (Zebra DataWedge: salida «Keystroke», con Intro al final), basta con escanear en cualquier pantalla de la app: no hace falta la cámara.</p>
   <div class="searchbox"><input id="wtest" type="search" placeholder="Toca aquí y escanea para probar" aria-label="Prueba del lector"></div>
-  <p class="mut mt">Último código recibido: <b id="wlast">${esc(lastRaw.replace(/\x1d/g,'⟨GS⟩'))||'ninguno'}</b></p>`;
+  <p class="mut mt">Último código recibido: <b id="wlast">${esc(lastRaw.replace(/\x1d/g,'⟨GS⟩'))||'ninguno'}</b></p><div id="wgs">${gsHint(lastRaw)}</div>
+  <p class="mut" style="font-size:13px">Para que el lote y el nº de serie no salgan pegados, el lector tiene que enviar el separador <b>GS</b> (también llamado FNC1). Al probar con el código cuadrado de una caja, aquí debe verse ⟨GS⟩ entre los datos. Si no aparece, actívalo en el lector: en Zebra (DataWedge), en la salida «Keystroke», activa el envío de caracteres de control; en los lectores de anillo, escanea en su manual el código «Transmit GS / FNC1» (o «Enable FNC1»).</p>`;
   const hoja=hojaOK()?`<div class="${syncErr?'note':'ok'}" style="margin-top:4px">${syncErr?esc(syncErr):'✓ Conectada a la hoja de Google. Los CN se guardan allí y se comparten con quien use la misma hoja.'}<br><span class="mut">${lastSync?'Última sincronización: '+new Date(lastSync).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'Sin sincronizar todavía'}${queue.length?' · '+queue.length+' pendiente'+(queue.length>1?'s':''):''}</span></div>
-  <div class="row mt"><button data-act="hojasync">Sincronizar ahora</button><button data-act="hojalink">Copiar enlace para compañeros</button><button data-act="hojaoff">Desconectar</button></div>`
+  <div class="row mt"><button data-act="hojasync">Sincronizar ahora</button><button data-act="hojaqr" class="pri">Configurar otro móvil (QR)</button><button data-act="hojalink">Copiar enlace</button><button data-act="hojaoff">Desconectar</button></div><div id="qrbox"></div>`
   :`<p class="mut" style="margin-top:4px">Ahora los CN solo se guardan en este móvil. Conecta la hoja de Google para guardarlos en Drive y compartirlos.</p>${syncErr?`<div class="note">${esc(syncErr)}</div>`:''}
   <div class="mt"><input id="hurl" type="search" placeholder="Enlace de la hoja (https://script.google.com/…/exec)" value="${esc(cfg.url)}" aria-label="Enlace de la hoja"></div>
   <div class="row mt"><input id="hclave" type="search" placeholder="Clave" value="${esc(cfg.clave)}" style="flex:1;min-width:8em" aria-label="Clave"><button class="pri" data-act="hojasave">Conectar</button></div>`;
